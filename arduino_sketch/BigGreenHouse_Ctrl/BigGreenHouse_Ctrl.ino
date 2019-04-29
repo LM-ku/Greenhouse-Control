@@ -13,12 +13,7 @@ CAPACITIVE SOIL MOISTURE SENSOR (Влажность почвы)
      Gnd (Ground)         ->  Gnd
      AI  (Analog Input)   ->  ADC0 
 
-PULS FLOW SENSOR (Расход воды на полив)
-     Vin (Voltage In)     ->  3.3V
-     Gnd (Ground)         ->  Gnd
-     DI  (Digital Input)  ->  JPIO16  1 puls / ... l water
-
-OUT VALVE RELAY (Орошение)
+VALVE RELAY (Орошение)
      DO  (Digital Output) ->  JPIO13 	 
 
 FAN RELAY (Вентиляция)
@@ -27,6 +22,7 @@ FAN RELAY (Вентиляция)
 IRRIGATION TIMER
      DI  (Digital Input)  ->  JPIO12  puls for START irrigation 
      DI  (Digital Input)  ->  JPIO14  puls for STOP irrigation
+     DO  (Digital Output) ->  JPIOxx  puls for synchronization
 	 
 */
 
