@@ -54,18 +54,37 @@ PubSubClient client(espClient);
 #include <BME280I2C.h>              		          		// библиотека ВМЕ280I2C
 // bme(<Temperature Oversampling Rate>, <Humidity Oversampling Rate>, <Pressure Oversampling Rate>, <Mode>, <Standby Time>, <Filter>, <SPI Enable>, <BME280 Address>)
 // BME280I2C bme(0x1, 0x1, 0x1, 0x1, 0x5, 0x0, false, 0x77); 
-BME280I2C bme;								// По умолчанию
+BME280I2C bme;								
 float temp, hum, pres, moist;
 
 
 // **** ОБЪЯВЛЕНИЕ ПЕРЕМЕННЫХ
-float set_temp, set_hum, set_moist;					// значения датчиков
+float set_temp, set_hum, set_moist;	// уставки температуры и влажности воздуха, влажности почвы
+int air_val, water_val;	// пороговые значения датчика влажности почвы
 
-int irrigation_valve 	= 13;                
-int ventilation_fan 	= 15;
-int irrigation_start	= 12;
-int irrigation_stop	= 14;
-int flow_meter 		= 16;  
+
+int relay_valve = 15;	// gpio 15 - управление реле клапана воды               
+int relay_fan 	= 13;	// gpio 13 - управление реле вентиляторов
+int timer_start	= 16;	// gpio 16 - инпульс --> HIGH таймера при наступлении события  
+int timer_stop	= 14;	// gpio 14 - импульс --> HIGH таймера при завершении заданного интервала  
+int timer_rst	= 12;  	// gpio 12 - двойной импульс HIGH --> LOW для инициализации таймера 
+//				     при дистанционном включении реле клапана воды
+//				     с этого момента начнется новый отсчет времени таймером
+//				     для начала следующего полива 
+
+boolean local_fan, local_valve, rem_fan, rem_valve, irrigation;
+
+byte state;	// bit 0 - irrigation (+1)
+		// bit_1 - ... (+2)
+		// bit_2 - ... (+4)
+		// bit_3 - ... (+8)
+		// bit_4 - ... (+16)
+		// bit_5 - ... (+32)
+		// bit_6 - ... (+64)
+		// bit_7 - ... (+128)
+
+float set_temp 	= 22.0;
+float set_hum	= 50.0;
 
 
 unsigned long PreTime;                                           	// отметка системного времени в предыдущем цикле
@@ -79,11 +98,85 @@ int value = 0;
 
 
 
+// ------------------------------------------------------------
+//                 SENSORS_RD - ОПРОС ДАТЧИКОВ
+// ------------------------------------------------------------
+void sensors_rd() {
 
+// **** ОПРОС ДАТЧИКА BME280
+  //float temp(NAN), hum(NAN), pres(NAN);
+  	
+  BME280::TempUnit tempUnit(BME280::TempUnit_Celsius);
+  BME280::PresUnit presUnit(BME280::PresUnit_Pa);
+  bme.read(pres, temp, hum, tempUnit, presUnit);  // считать значения давления, температуры, влажности, в метрической системе, давление в Ра 
+  //temp -= 0.3;	// correct temp
+  pres /= 133.3;	// convert to mmHg
+  
+// **** ОПРОС ДАТЧИКА ВЛАЖНОСТИ ПОЧВЫ  
+  air_val = 520;	// EEPROM.read(xxx, air_val) - показания датчика на воздухе, соответствуют 0% влажности
+  water_val = 260;	// EEPROM.read(xxx, water_val) - показания датчика в воде, соответствуют 100% влажности
+    	
+	
+  int sensor_moist = analogRead(0);
+  
+  if (sensor_moist <= air_val) {
+	sensor_moist = air_val;
+  }
+  if (sensor_moist >= water_val) {
+	sensor_moist = water_val;
+  }
+  moist = 100.0 * float(air_val-sensor_moist) / float(air_val-water_val);
+  
+// *** ВЫВОД ИНФОРМАЦИИ С ДАТЧИКОВ
+  Serial.print ("Температура воздуха   ");
+  Serial.print (temp);
+  Serial.println ("   *C");
+  
+  Serial.print ("Влажность воздуха   ");
+  Serial.print (hum);
+  Serial.println ("   %");
+  
+  Serial.print ("Давление   ");
+  Serial.print (pres);
+  Serial.println ("   mmHg");
+
+  Serial.print ("Влажность почвы   ");
+  Serial.print (moist);
+  Serial.print ("   %  ["); 
+  Serial.print (sensor_moist);  
+  Serial.println ("]"); 
+}
   
 
+// ------------------------------------------------------------
+//              OUTPUT CTRL - УПРАВЛЕНИЕ ВЫХОДАМИ
+// ------------------------------------------------------------
+// В ЛОКАЛЬНОМ РЕЖИМЕ (ctrl == false) :
+// - реле вентиляции управляется по разности текущей и заданной температуры и влажности воздуха,
+// - реле клапана воды включается по сигналу от таймера, отключается в зависимости от влажности почвы,
+// уставки температуры и влажности изменяются через Web-сервер или через получение соответствующих 
+// сообщений от MQTT брокера.
+// В ДИСТАНЦИОННОМ РЕЖИМЕ (ctrl == true) :
+// - реле вентиляции включается и выключается командами от MQTT брокера,
+// - реле клапана воды включается и выключается командами от MQTT брокера,
+// - при включении клапана воды формируются два импульса (HiGH --> LOW) для инициализации начала отсчета
+//   времени между включениями клапана воды.
+void output_ctrl() {
+  set_temp = 22.5; 	// EEPROM_read_float
+  set_hum = 50.0;	// EEPROM_read_float
+  // - вентиляция
+  if (temp > set_temp+2.5) local_fan = true ;	// если жарко, включить вентиляцию
+  if (hum > set_hum+10.0) local_fan = true ;	// если влажно, включить вентиляцию
+  if (temp < set_temp-2.5) && (hum < set_hum-10.0) local_fan = false ;	// если не жарко и не влажно, выключить вентиляцию
+  if (temp < 15.0) local_fan = false ; 	// если температура ниже 15 градусов, выключить вентиляцию
+  // - ирригация
+  if (digital.Read(timer_start)&&!digital.Read(timer_stop)) irrigation= true;
+  if (!digital.Read(timer_start)&&digital.Read(timer_stop)) irrigation= false;  
+  Write(state, 0, irrigation);
+  //EEPROM.put(xxx,state);	// сохранить состояние в eeprom
+	
 
-
+}
 
 
 // ------------------------------------------------------------
@@ -159,16 +252,30 @@ void setup() {
   PreTime = millis();                                              	// сохранить системное время 
 
 // **** ИНИЦИАЛИЗАЦИЯ ВЫВОДОВ
-  pinMode(LED_BUILTIN, OUTPUT);				            	// встроенный светодиод
-  pinMode(ventilation_fan, OUTPUT);			          	// подключение реле вентиляции
-  pinMode(irrigation_valve, OUTPUT);  		        		// подключение реле клапана полива
+  pinMode(LED_BUILTIN, OUTPUT);	// встроенный светодиод
+  pinMode(relay_fan, OUTPUT);	// подключение реле вентиляции
+  pinMode(relay_valve, OUTPUT);	// подключение реле клапана полива
  
-  pinMode(flow_meter, INPUT);				              	// подключение расходомера
-  pinMode(irrigation_start, INPUT);
-  pinMode(irrigation_stop, INPUT);
+  
+  pinMode(timer_start, INPUT);
+  pinMode(timer_stop, INPUT);
+  pinMode(timer_rst, OUTPUT);
+
+	
   
 // **** SERIAL ПОРТ
-  Serial.begin(9600);						 
+  Serial.begin(9600);	
+	
+// проверить состояние данных в EEPROM  
+// если в EEPROM есть корректные данные
+// - восстановить значения уставок из EEPROM,
+// - восстановить состояния из EEPROM
+// - инициировать подключение к WiFi
+	
+// если данные в EEPROM не корректные, 	
+	
+	
+	
 
 // **** WiFi
   setup_wifi();
@@ -186,6 +293,11 @@ void setup() {
     delay(500);								// с частотой 1 Hz
     ct += 1:
   }
+	
+  
+	
+	
+	
 
   delay(500);  
   PreTime = millis();               		        		// отметка времени в конце цикла программы 
@@ -281,50 +393,4 @@ void loop() {
 }
 
 
-// ------------------------------------------------------------
-//                 SENSORS_RD - Опрос датчиков
-// ------------------------------------------------------------
-void sensors_rd() {
 
-// **** ОПРОС ДАТЧИКА BME280
-  float temp(NAN), hum(NAN), pres(NAN);
-//  bool metric = true;
-//  uint8_t pressureUnit(0);   						// B000 = Pa, B001 = hPa, B010 = Hg, B011 = atm, B100 = bar, B101 = torr, B110 = N/m^2, B111 = psi   
-  BME280::TempUnit tempUnit(BME280::TempUnit_Celsius);
-  BME280::PresUnit presUnit(BME280::PresUnit_Pa);
-  bme.read(pres, temp, hum, tempUnit, presUnit);  // считать значения давления, температуры, влажности, в метрической системе, давление в Ра 
-//  temp -= 0.3;                  					// correct temp
-  pres /= 133.3;                  					// convert to mmHg
-  
-// **** ОПРОС ДАТЧИКА ВЛАЖНОСТИ ПОЧВЫ  
-  const int air_val = 520;							// показания датчика на воздухе, соответствуют 0%
-  const int water_val = 260;  						// показания датчика в воде, соответствуют 100%
-  int sensor_moist = analogRead(0);
-  
-  if (sensor_moist <= air_val) {
-	sensor_moist = air_val;
-  }
-  if (sensor_moist >= water_val) {
-	sensor_moist = water_val;
-  }
-  moist = 100.0 * float(air_val-sensor_moist) / float(air_val-water_val);
-  
-// *** ВЫВОД ИНФОРМАЦИИ С ДАТЧИКОВ
-  Serial.print ("Температура воздуха   ");
-  Serial.print (temp);
-  Serial.println ("   *C");
-  
-  Serial.print ("Влажность воздуха   ");
-  Serial.print (hum);
-  Serial.println ("   %");
-  
-  Serial.print ("Давление   ");
-  Serial.print (pres);
-  Serial.println ("   mmHg");
-
-  Serial.print ("Влажность почвы   ");
-  Serial.print (moist);
-  Serial.print ("   %  ["); 
-  Serial.print (sensor_moist);  
-  Serial.println ("]"); 
-}
