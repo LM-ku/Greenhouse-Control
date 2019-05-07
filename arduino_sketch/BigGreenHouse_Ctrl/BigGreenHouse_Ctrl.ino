@@ -61,10 +61,10 @@ float temp, hum, pres, moist;
 // **** ОБЪЯВЛЕНИЕ ПЕРЕМЕННЫХ
 float set_temp, set_hum, set_moist;	// уставки температуры и влажности воздуха, влажности почвы
 int air_val, water_val;	// пороговые значения датчика влажности почвы
+int last_irr_month, last_irr_day, last_irr_hour;	// месяц, день и час окончания предыдущего полива
 
-
-int relay_valve = 15;	// gpio 15 - управление реле клапана воды               
-int relay_fan 	= 13;	// gpio 13 - управление реле вентиляторов
+int relay_valve = 13;	// gpio 13 - управление реле клапана воды               
+int relay_fan 	= 15;	// gpio 15 - управление реле вентиляторов
 int timer_start	= 16;	// gpio 16 - инпульс --> HIGH таймера при наступлении события  
 int timer_stop	= 14;	// gpio 14 - импульс --> HIGH таймера при завершении заданного интервала  
 int timer_rst	= 12;  	// gpio 12 - двойной импульс HIGH --> LOW для инициализации таймера 
@@ -72,16 +72,16 @@ int timer_rst	= 12;  	// gpio 12 - двойной импульс HIGH --> LOW д
 //				     с этого момента начнется новый отсчет времени таймером
 //				     для начала следующего полива 
 
-boolean local_fan, local_valve, rem_fan, rem_valve, irrigation;
+boolean local_fan, local_valve, rem_fan, rem_valve;
 
-byte state;	// bit 0 - irrigation (+1)
-		// bit_1 - ... (+2)
-		// bit_2 - ... (+4)
-		// bit_3 - ... (+8)
-		// bit_4 - ... (+16)
-		// bit_5 - ... (+32)
-		// bit_6 - ... (+64)
-		// bit_7 - ... (+128)
+byte state;	// bit 0 - irrigation 
+		// bit_1 - ... 
+		// bit_2 - ... 
+		// bit_3 - ... 
+		// bit_4 - ... 
+		// bit_5 - ... 
+		// bit_6 - ... 
+		// bit_7 - ... 
 
 float set_temp 	= 22.0;
 float set_hum	= 50.0;
@@ -165,14 +165,15 @@ void output_ctrl() {
   set_temp = 22.5; 	// EEPROM_read_float
   set_hum = 50.0;	// EEPROM_read_float
   // - вентиляция
-  if (temp > set_temp+2.5) local_fan = true ;	// если жарко, включить вентиляцию
-  if (hum > set_hum+10.0) local_fan = true ;	// если влажно, включить вентиляцию
-  if (temp < set_temp-2.5) && (hum < set_hum-10.0) local_fan = false ;	// если не жарко и не влажно, выключить вентиляцию
+  if (temp > set_temp+2.5) local_cmd_fan = true ;	// если жарко, включить вентиляцию
+  if (hum > set_hum+10.0) local_cmd_fan = true ;	// если влажно, включить вентиляцию
+  if (temp < set_temp-2.5) && (hum < set_hum-10.0) local_cmd_fan = false ;	// если не жарко и не влажно, выключить вентиляцию
   if (temp < 15.0) local_fan = false ; 	// если температура ниже 15 градусов, выключить вентиляцию
   // - ирригация
-  if (digital.Read(timer_start)&&!digital.Read(timer_stop)) irrigation= true;
-  if (!digital.Read(timer_start)&&digital.Read(timer_stop)) irrigation= false;  
-  Write(state, 0, irrigation);
+  if (digital.Read(timer_start)&&!digital.Read(timer_stop)) local_cmd_valve = true;
+  if (!digital.Read(timer_start)&&digital.Read(timer_stop)) local_cmd_valve = false;  
+  Write(state, 0, local_valve);
+  state[0] = local_cmd_valve;
   //EEPROM.put(xxx,state);	// сохранить состояние в eeprom
 	
 
