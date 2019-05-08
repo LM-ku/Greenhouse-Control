@@ -1,0 +1,51 @@
+﻿"<html>
+          <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+          <head>
+          <title>WiFi BigGreenHouse</title>
+          <style>.body { background-color: #FFFFFF; font-family: Arial, Helvetica, Sans-Serif; Color: #000000; font-size: 15pt;}</style>
+          <style>.b1 {background: red; color: white; font-size: 15pt ;}</style>
+          </head>";
+	<p><font size="3"><b><u>ДОСТУПНЫЕ СЕТИ WiFi</u></b></font></p>
+	<p><font size=\"2\">
+    нет доступных WiFi сетей
+    </font></p>\n\r
+    <p><font size=\"2\">
+    найдено WiFi сетей
+    wifi_scan += (n);
+    </font></p>\n\r   
+	<body>
+	<form method="POST" action="ok">
+  str += ssid_set;
+  
+  
+  <input type=\"submit\" value=\"Установить режим\" />
+Текущий профиль WiFi: 
+  if(len_ssid < 32 && len_ssid != 0){
+    str += ssid;
+  }
+----------
+	</br></br>
+Новый профиль WiFi ..........	
+Пароль для выбранной сети .. 
+ </br></br>
+	<input type="text" name="pswd"> WiFi PASSWORD</br></br>
+	Настройки  MQTT брокера : 
+	</br></br>
+	<input type="text" name="mqtt_server"> MQTT SERVER URL</br></br>
+	<input type="text" name="mqtt_port"> MQTT PORT</br></br>
+	<input type="text" name="mqtt_user"> MQTT USER</br></br>
+	<input type="text" name="mqtt_pass"> MQTT PASSWORD</br></br>
+	<input type=SUBMIT value="Cохранить настройки">
+	</form>
+	<form method="GET" action="/update">
+	<input type="SUBMIT" value="Обновить ПО"> Текущая версия ПО: 
+  str +=  String(FW_VERSION);
+   
+	</form>
+	<form method="GET" action="/clear_wifi_setup">
+	<input type="SUBMIT" class="b1" value="Очистить настройки !!!"></form>
+	<form method="GET" action="/">
+	<input type="SUBMIT" value="Настройки управления теплицей">
+	</form>
+	</body>
+	</html>
