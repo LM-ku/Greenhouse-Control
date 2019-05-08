@@ -48,8 +48,8 @@
 IPAddress local_IP(192,168,123,22);
 IPAddress gateway(192,168,123,1);
 IPAddress subnet(255,255,255,0);
-const char *ap_ssid = "BigGreenHouse";
-const char *ap_pass = "12345678";
+const char* ap_ssid = "BigGreenHouse";
+const char* ap_pass = "12345678";
 
 // === WiFi Scan ===
 String wifi_scan = "";
@@ -61,10 +61,10 @@ String pass = "dUfWKMTh";
 
 // === MQTT ===
 //IPAddress mqtt_server(192, 168, 123, 222);
-char* mqtt_server = "192.168.123.222";
-int mqtt_port = 1883;
-String mqtt_user = "";
-String mqtt_pass = "";
+char* mqtt_server       = "192.168.123.222";
+int mqtt_port           = 1883;
+String mqtt_user        = "";
+String mqtt_pass        = "";
 
 
 byte step_mqtt_send = 0; // переменная для поочередной (по однаму сообщению за цикл loop) публикации сообщений на MQTT брокере
@@ -551,40 +551,38 @@ void callback(char* topic, byte* payload, unsigned int length) {
 //                     ФУНКЦИЯ "MQTT RECONNECT"
 //----------------------------------------------------------------------------- 
 void reconnect() {
-  if((millis() - event_mqtt_connect) > 10000){  // повторять через 10 секунд
-    Serial.println();
-    Serial.print("SSID: ");
-    Serial.println(ssid);
-    Serial.print("Password: ");
-    Serial.println(pass);
+  if (WiFi.status() == WL_CONNECTED) {
+    if (!client.connected() && (millis() - event_mqtt_connect) > 5000) {  // повторять через 5 секунд
+      Serial.println("WiFi connected");
+      Serial.print("SSID: ");
+      Serial.println(ssid);
+      
+      Serial.print("IP address: ");
+      Serial.println(WiFi.localIP());
 
-    Serial.println("WiFi connected");
-    Serial.println("IP address: ");
-    Serial.println(WiFi.localIP());
-
-    Serial.print(F("MQTT SERVER : "));
-    Serial.println((String)mqtt_server);
-  
-    Serial.print(F("MQTT port : "));
-    Serial.println(mqtt_port);
+      Serial.println("Attempting MQTT connection...");
+      Serial.print("MQTT SERVER : ");
+      Serial.print((String)mqtt_server);
+      Serial.print(", port : ");
+      Serial.println(mqtt_port);
     
-    Serial.print(F("MQTT user : "));
-    Serial.println((String)mqtt_user);
-
-    Serial.print(F("MQTT pass : "));
-    Serial.println((String)mqtt_pass);
-    Serial.print("Attempting MQTT connection...");
-    if (client.connect("arduinoClient")) {
-      Serial.println("connected");
-      client.publish("outTopic","hello world");
-      client.subscribe("inTopic");
-    } 
-    else {
-      Serial.print("failed, rc=");
-      Serial.print(client.state());
-      Serial.println(" try again in 10 seconds");
+      Serial.print("MQTT user : ");
+      Serial.println((String)mqtt_user);
+      Serial.print("MQTT pass : ");
+      Serial.println((String)mqtt_pass);
+      
+      if (client.connect("BigGreenHouse")) {
+        Serial.println("connected");
+        client.publish("BigGreenHouse/info/connect",true);
+        client.subscribe("BigGreenHouse/cmd");
+      } 
+      else {
+        Serial.print("failed, rc=");
+        Serial.print(client.state());
+        Serial.println(" try again in 5 seconds");
+      }
+      event_mqtt_connect = millis(); 
     }
-    event_mqtt_connect = millis(); 
   }
 }
 
@@ -736,18 +734,19 @@ void setup() {
 
 }
 
-
-//==== ОСНОВНОЙ ЦИКЛ ==========================================================
+//-----------------------------------------------------------------------------
+//                            ОСНОВНОЙ ЦИКЛ 
+//-----------------------------------------------------------------------------
 void loop() {
-  
+  reconnect();  // проверить подключение к MQTT брокеру и при необходимости переподключиться
+
 
   digitalWrite(ESP_BUILTIN_LED, LOW);
   delay(1000);
   digitalWrite(ESP_BUILTIN_LED, HIGH);
   delay(1000);
   
-  if (WiFi.status() == WL_CONNECTED) if (!client.connected()) reconnect();
-  server.handleClient();
+    server.handleClient();
   ArduinoOTA.handle();
   
   
