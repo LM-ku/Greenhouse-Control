@@ -1,97 +1,185 @@
-<html>
-            <head><meta http-equiv=Content-Type content=text/html charset=utf-8>
-            <title>УПРАВЛЕНИЯ ТЕПЛИЦЕЙ</title>
-				<style>
-					body {background-color: #FFFFFF; font-family: Arial, Helvetica, Sans-Serif; Color: #000000; font-size: 12pt;}
-					.btn {font-family: Arial, Helvetica, Sans-Serif; Color: #000000; font-size: 12pt;}
-				</style>
-            </head>
-            <body>
-            <hr />    
-  <p><font size="3"><b><u>СОСТОЯНИЕ НА </u>
-  curent_time
-  </b></font></p>
-  <p>Атмосферное давление .. 
-  (pres)
-   mm.Hg </p>
-            <p>Температура воздуха ...... 
-  (temp)
-   град.С </p>
-            <p>Влажность воздуха .......... 
-  (hum)
-   % </p><br />
-  //if(digitalRead(14) == HIGH && mode > 0) {
-    <p><font color = "#00a000" size="2">>>> <u>ВЕНТИЛЯЦИЯ ВКЛЮЧЕНА!</u></font> </p>
-  //}
-  //if(digitalRead(14) == LOW && mode == 2) {
-    //<p><font color = "#0000FF" size="2">>>> <u>ВЕНТИЛЯЦИЯ ВЫКЛЮЧЕНА!</u></font> </p>
-  //}
-  <br /><p>Влажность почвы ............. 
-  (moist)
-   % </p><br />
-  //if(digitalRead(14) == HIGH && mode > 0) {
-  //  <p><font color = "#00a000" size="2">>>> <u>ИДЕТ ПОЛИВ!</u></font> </p>
-  //}
-  //if(digitalRead(14) == LOW && mode == 2) {
-    <p><font color = "#0000FF" size="2">>>> <u>ПОЛИВ ВЫКЛЮЧЕН!</u></font> </p>
-  //}
-  <p>После окончания предыдущего полива прошло:</p><p> 
-  //(last_irrig_day)
-  дн.  
-  //(last_irrig_hour)
-  час.  
-  //(last_irrig_min)
-  мин.</p><br /><hr /> 
- <p><font size="3"><b><u>РЕЖИМ  УПРАВЛЕНИЯ</u></b></font></p>
-            <form action="/ctrl_mode" method="POST" >
-            <input type="radio" style="width: 50px; " name="ctrl" value="false" checked > Локальный
-            <input type="radio" style="width: 50px; " name="ctrl" value="true"> Дистанционный 
-			<br /><br />
-            <input type="submit" class="btn" value="Установить режим" >
-            </form>
-            </p><br /><hr /><p><font size=3><b><u> УСТАВКИ УПРАВЛЕНИЯ </u></b></font></p>
-            <form action="/setting" method="POST">
-			- температура воздуха ...
-            <input type="text" style="width: 50px; font-size: 15;" name="set_temp" value=
-  //str += float_to_String(set_temp)
-  n/> град.С<br /><br />
-			- влажность воздуха .......
-            <input type="text" style="width: 50px; font-size: 15;" name="set_hum" value=
-  //str += float_to_String(set_hum)
-  n/> %<br /><br />
-			- влажность почвы ..........
-            <input type="text" style="width: 50px; font-size: 15;" name="set_moist" value=
-  //str += float_to_String(set_moist)
-  n/> %<br /><br />
-            <input type="submit" class="btn" value="Сохранить уставки" />
-            </form>
-            <br /><hr />
-			 <p><font size="3"><b><u>ПОДКЛЮЧЕНИЕ К СЕТИ</u></b></font></p>
+<!DOCTYPE HTML>
+  <html>
+  <head>
+  <meta charset="UTF-8" name="viewport" content="width=device-width, initial-scale=1">
+  <title>WiFi BigGreenHouse</title>
+  <style type="text/css">
+	body { 
+	 background-color: #FFFFFF; 
+	 font-family: Arial, Helvetica, Sans-Serif; 
+	 Color: #000000; 
+	 font-size: 15pt
+	}
+	.txt {
+	 display: inline-block;
+	 width: 200px;
+	}
+    .ctrl_txt {
+	 display: inline-block;
+	 width: 200px;
+	}
+	.sensors_txt {
+	 display: inline-block;
+	 width: 250px;
+	}
+	.btn {
+	 background: #eeeeee; 
+	 color: #000000; 
+	 border-radius: 4px;
+	 font-size: 15pt 
+	}
+	.ctrl {
+	 line-height: 36px;
+	 background-color: #00cccc;
+	 display: inline-block;
+	 width: 250px;
+	 position: relative;
+	 text-align: center;
+	 color: #000000;
+	 border-radius: 4px;
+	 font-size: 15pt; 
+	}
+	.ctrl_on{
+	 line-height: 36px;
+	 background-color: #00cccc;
+	 display: inline-block;
+	 width: 250px;
+	 position: relative;
+	 text-align: center;
+	 color: #009900;
+	 border-radius: 4px;
+	 font-size: 15pt; 
+	}
+	.ctrl_off{
+	 line-height: 36px;
+	 background-color: #00cccc;
+	 display: inline-block;
+	 width: 250px;
+	 position: relative;
+	 text-align: center;
+	 color: #FF0000;
+	 border-radius: 4px;
+	 font-size: 15pt; 
+	}
+	.sensors_val {
+	 line-height: 36px;
+	 background-color: #00cccc;
+	 display: inline-block;
+	 width: 200px;
+	 position: relative;
+	 text-align: center;
+	 color: #000000;
+	 border-radius: 4px;
+	 font-size: 15pt; 
+	}
+	.mqtt {
+	 line-height: 36px;
+	 background-color: #00cccc;
+	 display: inline-block;
+	 width: 250px;
+	 position: relative;
+	 text-align: center;
+	 color: #000000;
+	 border-radius: 4px;
+	 font-size: 15pt; 
+	}
+  </style>
+  </head>
+  <body>
+  
+  <form method="GET" action="/date_time_set">
+  <p>Дата : 
+  <input type="SUBMIT" class="sensors_val" value="
+  day()
+  .
+  month()
+  .
+  year()
+  г. 
+  ">
+  &nbsp Время :
+  <input type="SUBMIT" class="sensors_val" value="
+  hour()
+  :
+  minute()
+  :
+  second()
+  "></p><hr />
+  </form>
 
-            <form action="/WiFi_setup.html" method="GET">
-//if(WiFi.status() == WL_CONNECTED) {
-			<p>WiFi connected. SSID:<font color = "#00a000" size="2">
+  <form method="GET" action="/ctrl_set">
+  <p><font class="ctrl_txt"> Режим управления: </font>
+  <input type="SUBMIT" class="ctrl_off" value="
+  ЛОКАЛЬНЫЙ 
+  "></p><hr />
+  </form>
+  
+  <p><font class="sensors_txt"> Атмосферное давление: </font>
+  <font class="sensors_val">
+  pres
+  mm.Hg </font></p>
+  <p><font class="sensors_txt">Температура воздуха: </font>
+  <font class="sensors_val">
+  temp
+  град.С </font></p>
+  <p><font class="sensors_txt">Влажность воздуха: </font> 
+  <font class="sensors_val">
+  hum
+   % </font></p>
+   
+  <form method="GET" action="/ventilation_adj">
+  <p><font class="ctrl_txt"> Вентиляция: </font>
+  <input type="SUBMIT" class="ctrl_on" value="
+  ВКЛЮЧЕНА 
+  "></p><hr />
+  </form>
+  
+  <p><font class="sensors_txt">Влажность почвы: </font> 
+  <font class="sensors_val">
+  moist
+   % </font></p>
+  
+  <form method="GET" action="/irrigation_adj">
+  <p><font class="ctrl_txt"> Клапан полива: </font>
+  <input type="SUBMIT" 
+  class="ctrl_on" value=" ОТКРЫТ "></p><hr />
+  <!--class="ctrl_off" value=" ЗАКРЫТ "></p><hr /> -->
+  </form>
+  
+  
+ 
+    <p>После окончания предыдущего полива прошло:</p>
+	<p><font class="ctrl">
+    last_irrig_day
+     дн.
+    last_irrig_hour
+      час.  
+    last_irrig_minute
+     мин. 
+	</font></p>
+    <br /><hr />
+
+
+	<form method="GET" action="/wifi_setup">
+	<!--<p><font class="txt" style="width: 75px"> WiFi:</font> -->
+	<p> WiFi: <input type="SUBMIT" class="mqtt" value="
+	ssid 
+	">
+	<font class="txt" style="color: #FF0000"> НЕ ПОДКЛЮЧЕНО !!!</font>
+	<!-- <font class="txt" style="color: #009900"> ПОДКЛЮЧЕНО </font> -->
+	</p></form>
 	
-//str += ssid
-			</p><p></font>IP addres:<font color = "#00a000" size="2">   
-//str += String(WiFi.localIP())
-			</font></p>
-			<p>MQTT broker:   
-//if(client.connect("BigGreenHouse")) {
-			<p><font color = "#00a000" size="2">
-//str += String(mqtt_server)
-			/
-//str += String(mqtt_port)
-			</font> </p>
-//}
-//else {
-			<p><font color = "#FF0000" size="2">MQTT not connected !!!</font> </p>
-}
-//else {
-			<p><font color = "#FF0000" size="2">WiFi not connected !!!</font> </p>
-}			
-            <input type="submit" class="btn" value="Изменить настройки подключения к WiFi и MQTT" />
-            </form><br /><br />
-            </body>
-            </html>
-			
+	<form method="GET" action="/MQTT_update">
+	<p><font class="txt">MQTT server URL: </font>
+	<input type="text" class="mqtt" name="mqtt_server"></p>
+	<p><font class="txt">MQTT port: </font>
+	<input type="text" class="mqtt" name="mqtt_port"></p>
+	<p><font class="txt">MQTT user: </font>
+	<input type="text" class="mqtt" name="mqtt_user"></p>
+	<p><font class="txt">MQTT password: </font>
+	<input type="text" class="mqtt" name="mqtt_pass"></p>
+	<p><input type=SUBMIT class="btn" value="Изменить настройки MQTT"></p>
+	</form>
+	</form>
+	
+	
