@@ -1100,7 +1100,7 @@ void irrigation_adj(){
   
   str += F(".setting_txt {");
   str += F(" display: inline-block;");
-  str += F(" width: 160px;");
+  str += F(" width: 165px;");
   str += F("}");
  
   str += F(".setting_val {");
@@ -1203,7 +1203,7 @@ void irrigation_adj(){
   str += float_to_String(set_moist);
   str += F("\n'/> +/- 5.0  % </p>");
   str += F("<p><font class='txt'><u> КАЛИБРОВКА ДАТЧИКА ВЛАЖНОСТИ ПОЧВЫ </u></font></p>");
-  str += F("<p><font class='sensors_txt'> &nbsp &nbsp выход датчика : </font>");
+  str += F("<p><font class='setting_txt'> Выход датчика : </font>");
   str += F("<font class='sensors_val'>"); 
   str += analog_sensor;
   str += F(" ед. </font></p>");
