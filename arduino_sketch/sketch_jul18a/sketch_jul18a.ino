@@ -863,14 +863,12 @@ void ctrl_mode(){
   str += F("<p><a href='ctrl_mode_set?ctrl=local'><button class='ctrl_off'>ЛОКАЛЬНЫЙ</button></a></p>");
   str += F("<p><a href='ctrl_mode_set?ctrl=man'><button class='ctrl_off'>ВРУЧНУЮ</button></a></p>");
   str += F("<hr/><br/>");
-  //str +=F("<font class='txt'>");
-  str += F("<form method='GET' action='/'>");
-  str += F("<a href='/' class='home_button'> НА ГЛАВНЫЙ ЭКРАН </a>");
+  str += F("<p><a href='/'><button class='home_button'> НА ГЛАВНЫЙ ЭКРАН </button></a></p>");
   str += F("</font>");         
   str += F("</body>");
   str += F("</html>\n\r");
   server.send ( 200, "text/html", str );
-  //delay(1000); 
+  delay(1000); 
 }
 
 // *** Установить режим управления: ЛОКАЛЬНЫЙ, ДИСТАНЦИОННЫЙ или ВРУЧНУЮ
@@ -881,8 +879,9 @@ void ctrl_mode_set() {
   if (server.arg(0)=="local") ctrl = 0;
   if (server.arg(0)=="rem")  ctrl = 1;
   if (server.arg(0)=="man") ctrl = 2;
-  handleRoot();
   delay(1000);
+  handleRoot();
+  //delay(1000);
 }
 
 
@@ -1517,7 +1516,7 @@ void WiFi_setup() {
 
   str += F("body {");
   str += F(" display: inline-block;");
-  str += F(" text-align: center;");
+  //str += F(" text-align: center;");
   str += F(" font-family:'Arial',sans-serif;");
   str += F(" margin-left: 20px;");
   str += F("}");
@@ -1544,7 +1543,7 @@ void WiFi_setup() {
   str += F("}");
 
   str += F(".home_button {");
-  str += F(" background-color: #006778;");
+  str += F(" background-color: #464e7a;");
   str += F(" border: none;");
   str += F(" box-shadow: 0 1px 8px 0 rgba(0,0,0,0.2), 0 6px 20px 0 rgba(0,0,0,0.19);");
   str += F(" -moz-border-radius:4px;");
