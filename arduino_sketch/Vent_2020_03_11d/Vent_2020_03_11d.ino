@@ -29,8 +29,7 @@ String mqtt_user = "";
 String mqtt_pass = "";
 
 byte step_mqtt_send = 0;  // переменная для поочередной (по одному сообщению за цикл loop) публикации сообщений на MQTT брокере
-String id_messages_ = "";
-boolean send_ = 0;
+boolean mqtt_send = false;
 
 WiFiClient espClient;
 PubSubClient client(espClient); 
@@ -72,6 +71,7 @@ long event_sensors_read; // для опроса датчиков
 long event_bme_begin; // для подключения  датчика BME280
 long event_web_server;
 long event_serial_output;
+long event_mqtt_publish;
 time_t mem;
 
 // ===== ПРОВЕРКА ДОСТУПНОСТИ WiFi СЕТИ ======
@@ -115,15 +115,15 @@ void sensors_read(){
 
   // *** ВЫВОД ДАННЫХ ОТ ДАТЧИКОВ В ПОРТ
   Serial.print ("Температура воздуха   ");
-  Serial.print (temperature);
+  Serial.print (temp);
   Serial.println ("   *C");
   
   Serial.print ("Влажность воздуха   ");
-  Serial.print (humidity);
+  Serial.print (hum);
   Serial.println ("   %");
   
   Serial.print ("Давление   ");
-  Serial.print (pressure);
+  Serial.print (pres);
   Serial.println ("   mmHg");
 
   Serial.print("Автоматическая команда реле вентилятора = ");  
@@ -881,7 +881,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   String messageTemp;
   for (int i=0;i<length;i++) {
     Serial.print((char)payload[i]);
-    messageTemp += (char)message[i];
+    messageTemp += (char)payload[i];
   }
   Serial.println();
 
@@ -899,7 +899,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
     //  Serial.print("Off");
     //}
     // ...
-} 
+  } 
+}
 
 //-----------------------------------------------------------------------------
 //                           MQTT PUBLISH
@@ -907,41 +908,56 @@ void callback(char* topic, byte* payload, unsigned int length) {
 //-----------------------------------------------------------------------------
 
 void publishData() {
-  // *** ПОДГОТОВКА ДАННЫХ
-  static char pressure[7];
-  dtostrf(temp, 6, 2, pressure);
-  static char temperature[7];
-  dtostrf(temp, 6, 2, temperature);
-  static char humidity[7];
-  dtostrf(hum, 6, 2, humidity);
+  if(mqtt_send) {
+    if (step_mqtt_send == 0) event_mqtt_publish = millis();
+ 
+    // *** ПОДГОТОВКА ДАННЫХ
+    static char pressure[10];
+    dtostrf(pres, 8, 2, pressure);
+    static char temperature[10];
+    dtostrf(temp, 8, 2, temperature);
+    static char humidity[10];
+    dtostrf(hum, 8, 2, humidity);
+ 
+    // *** ПУБЛИКАЦИЯ ПО ОДНОМУ СООБЩЕНИЮ ЗА ЦИКЛ   
+    switch (step_mqtt_send) {
+    case 0:    
+      client.publish("/BigGreenHouse/status/pressure", pressure);
+      Serial.print("MQTT client publish pressure = ");
+      Serial.println(pressure);
+      break;
+    case 1:    
+      client.publish("/BigGreenHouse/status/temperature", temperature);
+      Serial.print("MQTT client publish temperature = ");
+      Serial.println(temperature);
+      break;
+    case 2:    
+      client.publish("/BigGreenHouse/status/humidity", humidity);
+      Serial.print("MQTT client publish humidity = ");
+      Serial.println(humidity);
+      break;
+    case 3:    
+      client.publish("/BigGreenHouse/status/ventilation", String(fan_ctrl()).c_str());
+      Serial.print("MQTT client publish fan_ctrl = ");
+      Serial.println(fan_ctrl());
+      break;
+    case 4:    
+      //client.publish("/BigGreenHouse/.../...", ...);
+      break;
+    case 5:    
+      //client.publish("/BigGreenHouse/.../...", ...);
+      break;
+    case 6:    
+      //client.publish("/BigGreenHouse/.../...", ...);
+      break;        
+    }
 
-  if (step_mqtt_send >= 255) step_mqtt_send = 0;
-
-  switch (step_mqtt_send) {
-  case 0:    
-    //client.publish("/BigGreenHouse/.../pres", pressure);
-    break;
-  case 1:    
-    //client.publish("/BigGreenHouse/.../temp", temperature);
-    break;
-  case 2:    
-    //client.publish("/BigGreenHouse/.../hum", humidity);
-    break;
-  case 3:    
-    //client.publish("/BigGreenHouse/.../...", String(fan_ctrl()).c_str());
-    break;
-  case 4:    
-    //client.publish("/BigGreenHouse/.../...", ...);
-    break;
-  case 5:    
-    //client.publish("/BigGreenHouse/.../...", ...);
-    break;
-  case 6:    
-    //client.publish("/BigGreenHouse/.../...", ...);
-    break;        
-  }
-  step_mqtt_send += 1;
-  delay(100);
+    step_mqtt_send += 1;
+    if ((step_mqtt_send > 5) || (step_mqtt_send >= 255)) {
+      mqtt_send = false;
+      step_mqtt_send = 0;
+    }
+  }  
 }
 
 
@@ -957,14 +973,14 @@ void connect_mqtt() {
   event_reconnect = millis();
   
   // *** ЕСЛИ ОТСУТСТВУЕТ ПОДКЛЮЧЕНИЕ К WiFi РОУТЕРУ - ПОДКЛЮЧИТЬСЯ 
-  if (WiFi.status() != WL_CONNECTED) {    // WiFi.status() == 3 : WL_CONNECTED
+  if (WiFi.status() != 3) {    // WiFi.status() == 3 : WL_CONNECTED
     if (!sta_ok) connect_wifi();        // подключиться к роутеру, если ранее подключение к роутеру отсутствовало 
     else WiFi.mode(WIFI_AP_STA);          // включить точку доступа, если соединение с роутером временно отсутствует
     //else WiFi.softAP(ap_ssid, ap_pass);    
   }
 
   // *** ЕСЛИ WiFi ЕСТЬ, НО ОТСУТСТВУЕТ ПОДКЛЮЧЕНИЕ К БРОКЕРУ - ПОДКЛЮЧИТЬСЯ 
-  if (WiFi.isConnected() && (!client.connected()) {
+  if (WiFi.isConnected() && !client.connected()) {
     Serial.print("Attempting MQTT connection...");  // Попытка подключиться к MQTT-брокеру... 
       
     // *** ПОСЛЕ ПОДКЛЮЧЕНИЯ К БРОКЕРУ ПОДПИСАТЬСЯ НА ТОПИК(-И) 
@@ -993,8 +1009,7 @@ void connect_wifi() {
     WiFi.setAutoConnect(true);            //on power-on automatically connects to last used hwAP
     WiFi.setAutoReconnect(true);          //automatically reconnects to hwAP in case it's disconnected
   }
-  IPAddress dns2(8,8,8,8);
-  WiFi.disconnect();
+ 
   delay(100);  
 
   // - Keenetic-2927 - 
@@ -1095,6 +1110,8 @@ void setup() {
   WiFi.softAP(ap_ssid, ap_pass);
   
   // *** MQTT BROKER. ПОДКЛЮЧЕНИЕ К РОУТЕРУ (WiFi_STA)
+  IPAddress dns2(8,8,8,8);
+  WiFi.disconnect();
   connect_mqtt();
    
   // *** WEB-СЕРВЕР
@@ -1130,6 +1147,7 @@ void loop() {
   // *** клиент MQTT
   if(client.connected()) {
     client.loop();
+    if ((millis() - event_mqtt_publish) >= 10000) mqtt_send = true;
     publishData(); 
   }
   
@@ -1152,29 +1170,28 @@ void loop() {
     //Serial.println(String(ssid));
     Serial.print("WiFi status = ");
     switch (WiFi.status()) {
-  case 0:    
-    Serial.println("0: WL_IDLE_STATUS – WiFi в процессе между сменой статусов");
-    break;
-  case 1:    
-    Serial.println("1: WL_NO_SSID_AVAIL – заданный SSID находится вне зоны доступа");
-    break;
-  case 2:    
-    Serial.println("2: ????");
-    break;
-  case 3:    
-    Serial.println("3: WL_CONNECTED – успешно подключен к WiFi");
-    
-    break;
-  case 4:    
-    Serial.println("4: WL_CONNECT_FAILED – задан неправильный пароль");
-    break;
-  case 5:    
-    Serial.println("5: ????");
-    break;
-  case 6:    
-    Serial.println("6: WL_DISCONNECTED – ESP8266 не в режиме станции");
-    break;        
-  }
+    case 0:    
+      Serial.println("0: WL_IDLE_STATUS – WiFi в процессе между сменой статусов");
+      break;
+    case 1:    
+      Serial.println("1: WL_NO_SSID_AVAIL – заданный SSID находится вне зоны доступа");
+      break;
+    case 2:    
+      Serial.println("2: ????");
+      break;
+    case 3:    
+      Serial.println("3: WL_CONNECTED – успешно подключен к WiFi");
+      break;
+    case 4:    
+      Serial.println("4: WL_CONNECT_FAILED – задан неправильный пароль");
+      break;
+    case 5:    
+      Serial.println("5: ????");
+      break;
+    case 6:    
+      Serial.println("6: WL_DISCONNECTED – ESP8266 не в режиме станции");
+      break;        
+    }
     String state = "";
     state +=F("Присвоен IP адрес: ");
     state += WiFi.localIP().toString();
@@ -1183,5 +1200,5 @@ void loop() {
     Serial.println(WiFi.macAddress());
   }
 
-  delay(1000);
+  //delay(1000);
 }
