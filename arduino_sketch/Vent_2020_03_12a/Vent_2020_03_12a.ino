@@ -862,6 +862,7 @@ void ctrl_mode(){
 // *** Изменить режим управления ***
 void ctrl_mode_set() {
   if (server.arg(0)=="auto") ctrl = 0;
+  //if (server.arg(0)=="rem" && client.connected())  ctrl = 1;
   if (server.arg(0)=="rem")  ctrl = 1;
   if (server.arg(0)=="man") ctrl = 2;
   server.send ( 200, "text/html", root_str );
@@ -1208,24 +1209,6 @@ void setup() {
   // *** WEB-СЕРВЕР
   http_server();  
 
-
-
-  
-
-  Serial.print("    EEPROM =  ");
-  Serial.println(String(ch));
-  Serial.print("     len =  ");
-  Serial.println((String(ch)).length());
-  
-  Serial.print("   ap_ssid =  ");
-  Serial.println(ap_ssid);
-  Serial.print("     len =  ");
-  Serial.println(ap_ssid.length());
-  Serial.print("    eeprom_ok =  ");
-  Serial.println(eeprom_ok);
-
-
-  
   Serial.println("Ready");  //  "Готово" 
   digitalWrite(ESP_BUILTIN_LED, HIGH);
   
@@ -1337,27 +1320,27 @@ void loop() {
   if (rem_fan) state += 2;
   if (auto_fan) state += 4;
     
-  Serial.print("110   state = ");
-  Serial.println(state);
+  //Serial.print("110   state = ");
+  //Serial.println(state);
     
   EEPROM.put(110,state);
     
-  Serial.print("120   set_temp = ");
-  Serial.println(set_temp);
+  //Serial.print("120   set_temp = ");
+  //Serial.println(set_temp);
     
   EEPROM.put(120,set_temp);     // уставка температуры для включения вентиляции
 
-  Serial.print("124   set_hum = ");
-  Serial.println(set_hum);
+  //Serial.print("124   set_hum = ");
+  //Serial.println(set_hum);
     
   EEPROM.put(124,set_hum);      // уставка влажности для включения вентиляции
 
  
-  if (EEPROM.commit()) {
-    Serial.println("EEPROM successfully committed");
-  } 
-  else {
-    Serial.println("ERROR! EEPROM commit failed");
-  }
+  //if (EEPROM.commit()) {
+  //  Serial.println("EEPROM successfully committed");
+  //} 
+  //else {
+  //  Serial.println("ERROR! EEPROM commit failed");
+  //}
 
 }
