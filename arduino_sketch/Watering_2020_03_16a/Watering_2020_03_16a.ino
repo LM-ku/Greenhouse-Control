@@ -698,7 +698,7 @@ void handleRoot(){
  
   // *** Версия ПО и обновление 
   str += F("<form method='GET' action='upd'>");
-  str += F("<p><font class='set_txt'> Текущая версия ПО: </font>");
+  str += F("<p><font class='comm_txt'> Текущая версия ПО: </font>");
   str += F("<input type='SUBMIT' class='set_button'  value='");
   str += String(FW_VERSION);
   str += F("'/></p>"); 
