@@ -1,4 +1,4 @@
-#define FW_VERSION "Ventilation_2020-03-15"
+#define FW_VERSION "Watering_2020-03-16"
 
 /*
   EEPROM MAP :
@@ -32,11 +32,14 @@
 #include <Wire.h>
 #include <BME280I2C.h>
 
+// === Index ===
+byte n = 1;
+
 // === WiFi AP Mode === 
-IPAddress ap_ip(192,168,123,20);
-IPAddress ap_gateway(192,168,123,20);
+IPAddress ap_ip(192,168,123,(20+n));
+IPAddress ap_gateway(192,168,123,(20+n));
 IPAddress ap_subnet(255,255,255,0);
-String ap_ssid = "BGH_ventilation";
+String ap_ssid = "BGH_watering_"+String(n);
 String ap_pass = "12345678";
 
 // === WiFi STA Mode === 
@@ -47,8 +50,11 @@ boolean sta_ok = false;   // подключение к роутеру состо
 // === MQTT broker === 
 char* mqtt_server;
 int mqtt_port;
+String topic;
+String mqtt_client;
 String mqtt_user = "";
 String mqtt_pass = "";
+
 
 byte step_mqtt_send = 0;  // переменная для поочередной (по одному сообщению за цикл loop) публикации сообщений на MQTT брокере
 boolean mqtt_send = false;
@@ -62,41 +68,48 @@ ESP8266WebServer server(80);
 const char* root_str = "<!DOCTYPE HTML><html><head><meta http-equiv='refresh' content='1; /'></head></html>\n\r";
 const char* ctrl_str = "<!DOCTYPE HTML><html><head><meta http-equiv='refresh' content='1; /ctrl_mode'></head></html>\n\r";
 
-// === BME280 ===
-BME280I2C bme;
-float temp, pres, hum, moist;
-float set_temp = 24.0;  // не ниже 20*С, оптимально 20...25*С
-float set_hum = 50.0; // оптимальная влажность воздуха 45...60% 
+// === Capacitive Soil Moisture Sensor ===
+int sensor_moist;
+int air_val = 520;  // показания датчика на воздухе, соответствуют 0%
+int water_val = 260;  // показания датчика в воде, соответствуют 100%
 float set_moist = 65.0; // оптимальная влажность почвы 60...70% или более
+float moist;
+boolean sensor_error;
+boolean moist_ctrl = false;
 
 // === GPIO ===
-//const byte tmr_rst = 16;
-//const byte tmr_opn = 12;
-//const byte tmr_cls = 14;
-//const byte valve = 13;
-const byte fan = 15;
+const byte tmr_rst = 16;
+const byte tmr_opn = 12;
+const byte tmr_cls = 14;
+const byte valve = 13;
 const byte ESP_BUILTIN_LED = 2;
 
 // === CTRL - управление ===
 byte ctrl; // режим: 0 = auto, 1 = remote, 2 = manual
 boolean eeprom_ok;  // true == EEPROM содержит актуальные данные
-boolean man_fan;
-boolean rem_fan;    // дистанционная команда для реле вентилятора: false == выключить, true == включить
-boolean auto_fan;   // автоматическая команда для реле вентилятора: false == выключить, true == включить
-
+byte last_watering_day, last_watering_hour, last_watering_minute;
+boolean first_watering = false;
+boolean watering_run = false;         // состоялся полив после перезагрузки 
+boolean watering_state = false;
+boolean man_valve = false;
+boolean rem_valve = false;            // дистанционная команда для реле клапана полива: false = выключить, true = включить
+volatile boolean auto_valve = false;  // автоматическая команда для реле клапана полива: false = выключить, true = включить
 
 // === ТАЙМЕРЫ СОБЫТИЙ ===
 long eventTime; // для снятия текущего времени с начала старта
 long event_reconnect;  // для переподключения
 long event_sensors_read; // для опроса датчиков
-long event_bme_begin; // для подключения  датчика BME280
-long event_web_server;
+//long event_bme_begin; // для подключения  датчика BME280
 long event_serial_output;
 long event_mqtt_publish;
+long start_watering; // старт полива
+long end_watering; // окончание полива
+long after_watering; // прошло после окончания полива
+long watering_cont; // продолжительность полива
 time_t mem;
 
 // ===== ПРОВЕРКА ДОСТУПНОСТИ WiFi СЕТИ ======
-boolean scanWIFI(String found) {
+boolean scanWIFI(String found){
   uint8_t n = WiFi.scanNetworks();
   for (uint8_t i = 0; i < n; i++) {
     String ssidMy = WiFi.SSID(i);
@@ -106,94 +119,45 @@ boolean scanWIFI(String found) {
 }
 
 //-----------------------------------------------------------------------------
-//         ОПРОС ДАТЧИКА BME280. АВТОМАТИЧЕСКИЕ КОМАНДЫ ВЕНТИЛЯЦИИ
+//                       ОПРОС ДАТЧИКА ВЛАЖНОСТИ ПОЧВЫ
 //-----------------------------------------------------------------------------
 void sensors_read(){
   event_sensors_read = millis();
-  if (bme.begin()) {
-    Serial.println("BME280 подключен");    
-    // **** ОПРОС ДАТЧИКА BME280
-    BME280::TempUnit tempUnit(BME280::TempUnit_Celsius);
-    BME280::PresUnit presUnit(BME280::PresUnit_Pa);
-    bme.read(pres, temp, hum, tempUnit, presUnit);  // считать значения давления, температуры, влажности, в метрической системе, давление в Ра 
-    //  temp -= 0.3;  // correct <temp>
-    pres /= 133.3;  // convert <pres> to mmHg
-
-     
-    // *** АВТОМАТИЧЕСКАЯ КОМАНДА УПРАВЛЕНИЯ РЕЛЕ ВЕНТИЛЯТОРА
-    if (temp >= set_temp + 1.0) auto_fan = true; // включить вентилятора втоматически, если жарко
-    if (temp <= set_temp - 1.0 && hum < set_hum ) auto_fan = false;  // выключить вентилятор автоматически, если не жарко и влажность в норме 
-    if (temp <= 20.0) auto_fan = false;  // выключить вентилятор автоматически, если температура не выше 20 град.С
+  sensor_error = false;
+  int sensor_moist = analogRead(0);
+  if (sensor_moist >= air_val) {
+    moist = 0.0;
+    sensor_error = true;
   }
+  if (sensor_moist <= water_val) {
+    moist = 100.0;
+    sensor_error = true;
+  }
+  
+  if(sensor_error) moist_ctrl = true;
   else {
-    pres = 999.99;
-    temp = 99.99;
-    hum = 99.99;
-    Serial.println("BME280 не найден !!!");
-    if (ctrl == 0) ctrl = 2;
-    //auto_fan = false;
-  }
+    moist = 100.0 * float(air_val-sensor_moist) / float(air_val-water_val);
 
-  // *** ВЫВОД ДАННЫХ ОТ ДАТЧИКОВ В ПОРТ
-  Serial.print ("Температура воздуха   ");
-  Serial.print (temp);
-  Serial.println ("   *C");
+    // *** коррекция управления реле клапана полива по датчику влажности
+    //if (moist >= set_moist + 5.0 &&  auto_valve) auto_valve = false; // выключить реле клапана полива, если почва достаточно влажная
+    if(moist >= set_moist + 5.0) moist_ctrl = false;
+    if(moist <= set_moist - 5.0) moist_ctrl = true;
+  }
   
-  Serial.print ("Влажность воздуха   ");
-  Serial.print (hum);
-  Serial.println ("   %");
-  
-  Serial.print ("Давление   ");
-  Serial.print (pres);
-  Serial.println ("   mmHg");
-
-  Serial.print("Автоматическая команда реле вентилятора = ");  
-  Serial.println((auto_fan)? "ВКЛ." : "ВЫКЛ."); 
+  // *** вывод данных от датчика в порт
+  Serial.print ("Влажность почвы   ");
+  Serial.print (moist);
+  Serial.print ("   %  ["); 
+  Serial.print (sensor_moist);  
+  Serial.println ("]"); 
 }
 
-
-
 //-----------------------------------------------------------------------------
-//                     ЗАПИСЬ STRING В EEPROM
+//                    КОМАНДА УПРАВЛЕНИЯ РЕЛЕ КЛАПАНА ПОЛИВА
 //-----------------------------------------------------------------------------
-void EEPROM_String_write(int addr, String data)
-{
-  int _size =  data.length( );
-  int i;
-  for( i= 0; i< _size; i++)
-  {
-    EEPROM.put(i+addr, data[i] );
-  }
-  EEPROM.put( addr+_size, '\0') ;    //Add termination null character for String Data
-  EEPROM.end();
-}
- 
-//-----------------------------------------------------------------------------
-//                     ЧТЕНИЕ STRING ИЗ EEPROM
-//----------------------------------------------------------------------------- 
-String read_String(int addr) {
-  int i;
-  char data[100]; //Max 100 Bytes
-  int len=0;
-  unsigned char k;
-  k=EEPROM.read(addr);
-  while(k != '\0' && len<101)   //Read until null character
-  {    
-    k=EEPROM.read(addr+len);
-    data[len]=k;
-    len++;
-  }
-  data[len]='\0';
-  return String(data);
-}
-
-
-//-----------------------------------------------------------------------------
-//                      УПРАВЛЕНИЯ РЕЛЕ ВЕНТИЛЯЦИИ
-//-----------------------------------------------------------------------------
-boolean fan_ctrl() {
-  boolean out = ((ctrl==0) && auto_fan) || ((ctrl==1) && rem_fan) || ((ctrl==2) && man_fan);
-  //boolean out = man_fan;
+boolean valve_ctrl() {
+  boolean out = ((ctrl==0) && auto_valve && moist_ctrl) || ((ctrl==1) && rem_valve) || ((ctrl==2) && man_valve);
+  if(out) watering_run = true;
   return out;
 }
 
@@ -244,8 +208,6 @@ String float_to_String(float n){
 }
 
 
-
-
 //-----------------------------------------------------------------------------
 //                            ПЕРЕЗАГРУЗКА
 //-----------------------------------------------------------------------------
@@ -260,11 +222,12 @@ void reboot() {
 //-----------------------------------------------------------------------------
 void http_server() {  
   server.on("/", handleRoot); 
-  server.on("/ventilation_set", ventilation_set);
-  server.on("/ventilation_ctrl", ventilation_ctrl);
+  server.on("/watering_set", watering_set);
+  server.on("/watering_ctrl", watering_ctrl);
 
   server.on("/ctrl_mode", ctrl_mode);
   server.on("/ctrl_mode_set", ctrl_mode_set);
+  server.on("/watering_adj", watering_adj);
      
   server.on("/upd", upd);  
   server.on("/update", HTTP_POST, []() {
@@ -312,7 +275,7 @@ void http_server() {
   delay(1000);
 }
 
-// ===== ГЛАВНАЯ СТРАНИЦА. СОСТОЯНИЕ ВЕНТИЛЯЦИИ =====
+// ===== ГЛАВНАЯ СТРАНИЦА. СОСТОЯНИЕ СИСТЕМЫ ПОЛИВА =====
 void handleRoot(){
   String str = "";
   str += F("<!DOCTYPE HTML>");
@@ -340,7 +303,9 @@ void handleRoot(){
   
   str += F("<meta charset='UTF-8' name='viewport' content='width=device-width, initial-scale=1'>");
   str += F("<meta http-equiv='Refresh' content='60' />");
-  str += F("<title>ВЕНТИЛЯЦИЯ В ТЕПЛИЦЕ</title>");
+  str += F("<title>СИСТЕМА ПОЛИВА"); 
+  str += String(n);
+  str += F("</title>");
   str += F("<style type='text/css'>");
   
   str += F("body {");   
@@ -376,7 +341,7 @@ void handleRoot(){
   str += F(" display: inline-block;");
   str += F(" text-align: left;");
   str += F(" padding-left: 5px;");
-  str += F(" width: 115px;");
+  str += F(" width: 80px;");
   str += F("}");
 
   str += F(".comm_txt {");
@@ -608,33 +573,69 @@ void handleRoot(){
   str += F("<span id='date_txt'></span> г. &nbsp Время : "); 
   str += F("<span id='time_txt'> </span> </p><hr/>");
 
-  // *** Вентиляция 
-  str += F("<div class='align_center'><h2>ВЕНТИЛЯЦИЯ В ТЕПЛИЦЕ</h2></div><hr />");
+  // *** Полив 
+  //str += F("<div class='align_center'><h2>ПОЛИВ &nbsp");
+  str += F("БОЛЬШАЯ ТЕПЛИЦА. ПОЛИВ  # ");
+  str += String(n);
+  str += F("<hr/>");
+  //str += F("&nbsp В ТЕПЛИЦЕ</h2></div><hr/>");
   
-  // *** Показания датчиков 
-  //if (bme_rdy) {
-    str += F("<p><font class='sensors_txt'> Атмосферное давление: </font>");
-    str += F("<font class='sensors_value'>");
-    str += String(pres);
-    str += F(" mm.Hg </font></p>");
-    str += F("<p><font class='sensors_txt'>Температура воздуха: </font>");
-    str += F("<font class='sensors_value'>");
-    str += String(temp);
-    str += F(" град.С </font></p>");
-    str += F("<p><font class='sensors_txt'>Влажность воздуха: </font>"); 
-    str += F("<font class='sensors_value'>");
-    str += String(hum);
-    str += F(" % </font></p>");
-  //}
-  //else {
-  //  str += F("<p><font class='align_center'> ОШИБКА BME820 !!! </font></p>");
-  //}
+  // *** Показания датчика 
+
+  str += F("<p><font class='sensors_txt'>Влажность почвы: </font>"); 
+  str += F("<font class='sensors_value'>");
+  str += String(moist);
+  str += F(" % </font></p><hr/>");
   
-  // *** Состояние вентиляции
-  str += F("<p><font class='ctrl_txt'> Вентиляция: </font>");
-  if(digitalRead(fan))  str += F("<font class='state_on'> ВКЛЮЧЕНА");
-  if(!digitalRead(fan)) str += F("<font class='state_off'> ВЫКЛЮЧЕНА");
-  str += F("</font></p><hr/>");
+  str += F("<div align='left'>После окончания предыдущего полива <div>");
+  str += F("<p><font class='ctrl_txt'> прошло ");
+  if(first_watering) str += F(" более ");  
+  str += F(":</font><font class='ctrl_mode' >"); 
+  after_watering = (millis() - end_watering)/1000; // прошло времени после окончания полива
+  str += String(day(after_watering)-1);
+  str += F(" дн.");
+  str += String(hour(after_watering));
+  str += F("  час.");  
+  str += String(minute(after_watering));
+  str += F("  мин.</font></p>");
+
+  // *** клапан ОТКРЫТ
+  if(watering_state) {  
+    watering_cont = (millis() - start_watering)/1000; // определение продолжительности  полива
+    if(watering_state) {
+      str += F("<p><font class='ctrl_txt'> От начала полива : </font><font class='ctrl_mode'>");
+      if (day(watering_cont) > 1){
+        str += String(day(watering_cont)-1);
+        str += F(" дн.");
+      }
+      str += String(hour(watering_cont));
+      str += F(" час.");
+      str += digits_to_String(minute(watering_cont));
+      str += F(" мин.</font></p>");
+    }      
+    str += F("<p><font class='ctrl_txt'> Клапан полива: </font>");
+    str += F("<font class='state_on'> ОТКРЫТ ");
+  }
+
+  // *** клапан ЗАКРЫТ
+  if(!watering_state) {  
+    watering_cont = (end_watering - start_watering)/1000; // определение продолжительности  полива ==== !!!!!! УТОЧНИТЬ !!!!!!
+    if(!first_watering) {
+      str += F("<p><font class='ctrl_txt'> Длительность : </font><font class='ctrl_mode'>");
+      if (day(watering_cont) > 1){
+        str += String(day(watering_cont)-1);
+        str += F(" дн.");
+      }
+      str += String(hour(watering_cont));
+      str += F(" час.");
+      str += digits_to_String(minute(watering_cont));
+      str += F(" мин.</font></p>");
+    }
+    str += F("<p><font class='ctrl_txt'> Клапан полива: </font>");
+    str += F("<font class='state_off'> ЗАКРЫТ ");
+  }  
+  str += F("</font></p>"); 
+
 
   // *** Режим управления
   str += F("<p><font class='ctrl_txt'> Режим управления: </font>");
@@ -646,23 +647,19 @@ void handleRoot(){
 
   // *** Кнопки управления ВРУЧНУЮ
   if (ctrl == 2) {
-    str += F("<a href='/ventilation_ctrl?cmd=on'><button class='ctrl_on'> ВКЛЮЧИТЬ </button></a>&nbsp");
-    str += F("<a href='/ventilation_ctrl?cmd=off'><button class='ctrl_off'> ВЫКЛЮЧИТЬ </button></a></p>");
+    str += F("<a href='/watering_ctrl?cmd=on'><button class='ctrl_on'> ОТКРЫТЬ </button></a>&nbsp&nbsp");
+    str += F("<a href='/watering_ctrl?cmd=off'><button class='ctrl_off'> ЗАКРЫТЬ </button></a></p>");
   }
   str += F("<hr/>");
 
-  // *** Уставки АВТОМАТИЧЕСКОГО режима
-  str += F("<div class='align_center'>УСТАВКИ АВТОМАТИЧЕСКОГО РЕЖИМА</div><hr />");
-  str += F("<form  method='POST' action='/ventilation_set'>");
-  str += F("<p><font class='set_txt'> Tемпература </font>");
-  str += F("<input type='TEXT' class='set_val'  name='set_temp' placeholder=' "); 
-  str += float_to_String(set_temp);
-  str += F("\n'/><font class='set_txt'> +/- 1.0 °С </font></p>");
-  str += F("<p><font class='set_txt'> Влажность </font>");
-  str += F("<input type='TEXT' class='set_val' name='set_hum' placeholder=' ");
-  str += float_to_String(set_hum);
-  str +=F("\n'/><font class='set_txt'>  % </font></p>");
-  str += F("<p><font class='set_txt'> </font><input type='SUBMIT' class='set_button' value='ПРИМЕНИТЬ УСТАВКИ'></p>");
+  // *** Уставка датчика влажности почвы для АВТОМАТИЧЕСКОГО режима
+  str += F("УСТАВКА ДАТЧИКА ВЛАЖНОСТИ ПОЧВЫ <hr />");
+  str += F("<form  method='POST' action='/watering_set'>");
+  str += F("<p><font class='ctrl_txt'> Влажность почвы : </font>");
+  str += F("<input type='TEXT' class='set_val'  name='set_moist' placeholder=' "); 
+  str += float_to_String(set_moist);
+  str += F("\n'/><font class='set_txt'> +/-5% </font></p>");
+  str += F("<p><font class='comm_txt'> </font><input type='SUBMIT' class='set_button' value='ПРИМЕНИТЬ ЗНАЧЕНИЕ'></p>");
   str += F("</form><hr/>");
 
   // *** Информация о подключениях
@@ -701,8 +698,8 @@ void handleRoot(){
  
   // *** Версия ПО и обновление 
   str += F("<form method='GET' action='upd'>");
-  str += F("<p><font class='set_txt'> Версия ПО: </font>");
-   str += F("<input type='SUBMIT' class='set_button'  value='");
+  str += F("<p><font class='set_txt'> Текущая версия ПО: </font>");
+  str += F("<input type='SUBMIT' class='set_button'  value='");
   str += String(FW_VERSION);
   str += F("'/></p>"); 
   str += F("</form>");
@@ -715,28 +712,23 @@ void handleRoot(){
   delay(1000); 
 }
 
-// *** Управление вентиляцией ВРУЧНУЮ  ***
-void ventilation_ctrl() {
-  if (server.arg(0)=="on") man_fan = true;  
-  if (server.arg(0)=="off") man_fan = false; 
+// *** Управление поливом ВРУЧНУЮ  ***
+void watering_ctrl() {
+  if (server.arg(0)=="on") man_valve = true;  
+  if (server.arg(0)=="off") man_valve = false; 
   server.send ( 200, "text/html", root_str );   
   delay(1000);
 }
 
-// *** Изменить уставки АВТОМАТИЧЕСКОГО режима ***
-void ventilation_set(){
+// *** Изменить уставки датчика влажности почвы для АВТОМАТИЧЕСКОГО режима ***
+void watering_set(){
   float set;
   set = String_to_float(server.arg(0));
-  if (set != 0.0) set_temp = set;  
-  if (set_temp < 21.0)  set_temp = 21.0;
-  set = String_to_float(server.arg(1)); 
-  if (set != 0.0) set_hum = set;  
-  if (set_hum < 40.0)  set_hum = 40.0;
-  if (set_hum > 90.0)  set_hum = 90.0;
-  Serial.print(F("set_temp = "));
-  Serial.println(set_temp);
-  Serial.print(F("set_hum = "));
-  Serial.println(set_hum);
+  if (set != 0.0) set_moist = set; 
+  if (set_moist < 10.0)  set_moist = 10.0;
+  if (set_moist > 100.0)  set_moist = 100.0;
+  //Serial.print(F("set_moist = "));
+  //Serial.println(set_moist);
   server.send ( 200, "text/html", root_str ); 
   delay(1000);
 }
@@ -766,12 +758,43 @@ void ctrl_mode(){
   str += F(" text-align: center;");
   str += F("}");
   
+  str += F(".sensors_txt {");
+  str += F(" display: inline-block;");
+  str += F(" text-align: left;");
+  str += F(" padding-left: 5px;");
+  str += F(" width: 200px;");
+  str += F("}");
+  
   str += F(".ctrl_txt {");
   str += F(" display: inline-block;");
   str += F(" text-align: left;");
   str += F(" padding-left: 5px;");
   str += F(" width: 155px;");
   str += F("}");
+
+  str += F(".set_txt {");
+  str += F(" display: inline-block;");
+  str += F(" text-align: left;");
+  str += F(" padding-left: 5px;");
+  str += F(" width: 115px;");
+  str += F("}");
+
+  str += F(".sensors_value {");
+  str += F(" line-height: 36px;");
+  str += F(" display: inline-block;");
+  str += F(" width: 125px;");
+  str += F(" position: relative;");
+  str += F(" text-align: center;");
+  str += F(" font-size: 100%;");
+  str += F(" text-decoration: none;");
+  str += F(" color: #FFF;");
+  str += F(" background-color: #006778;");
+  str += F(" background-image: -webkit-linear-gradient(top, #0087b0, #006778);");
+  str += F(" background-image: linear-gradient(to bottom, #0087b0, #006778);");
+  str += F(" border-bottom: solid 3px #004462;");
+  str += F(" border-radius: 4px;");
+  str += F(" box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 3px 2px rgba(0, 0, 0, 0.19);");
+  str += F("}");  
 
   str += F(".state {");
   str += F(" line-height: 36px;");
@@ -812,6 +835,55 @@ void ctrl_mode(){
   str += F(" top:2px;");
   str += F(" box-shadow: 0 0 0 0 rgba(0,0,0,0.2), 0 0 0 0 rgba(0,0,0,0.19);");
   str += F("}");
+
+  str += F(".set_val {");
+  str += F(" padding: 16px;");
+  str += F(" width: 90px;");
+  str += F(" position: relative;");
+  str += F(" text-align: center;"); 
+  str += F(" -webkit-transition: all 0.30s ease-in-out;");
+  str += F(" -moz-transition: all 0.30s ease-in-out;");
+  str += F(" -ms-transition: all 0.30s ease-in-out;");
+  str += F(" outline: none;");
+  str += F(" box-sizing: border-box;");
+  str += F(" -webkit-box-sizing: border-box;");
+  str += F(" -moz-box-sizing: border-box;");
+  str += F(" background: #fff;");
+  str += F(" margin-bottom: 4%;");
+  str += F(" border: 1px solid #ccc;");
+  str += F(" padding: 3%;");
+  str += F(" color: #555;");
+  str += F(" font-size: 100%;");
+  str += F("}");
+
+  str += F(".set_val:focus {");
+  str += F(" box-shadow: 0 0 5px #276873;");
+  str += F(" padding: 3%;");
+  str += F(" border: 2px solid #276873;");
+  str += F("}");
+  
+  str += F(".set_button {");
+  str += F(" line-height: 36px;");
+  str += F(" display: inline-block;");
+  str += F(" width: 210px;");
+  str += F(" position: relative;");
+  str += F(" text-align: center;");
+  str += F(" font-size: 100%;");
+  str += F(" text-decoration: none;");
+  str += F(" color: #FFF;");
+  str += F(" background-color: #006778;");
+  str += F(" background-image: -webkit-linear-gradient(top, #0087b0, #006778);");
+  str += F(" background-image: linear-gradient(to bottom, #0087b0, #006778);");
+  str += F(" border-bottom: solid 3px #004462;");
+  str += F(" border-radius: 4px;");
+  str += F(" box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 3px 2px rgba(0, 0, 0, 0.19);");
+  str += F("}");
+   
+  str += F(".set_button:active {");
+  str += F(" position:relative;");
+  str += F(" top:2px;");
+  str += F(" box-shadow: 0 0 0 0 rgba(0,0,0,0.2), 0 0 0 0 rgba(0,0,0,0.19);");
+  str += F("}");
   
   str += F(".home_button {");
   str += F(" line-height: 36px;");
@@ -840,7 +912,9 @@ void ctrl_mode(){
   str += F("</head>");
   str += F("<body>");
   
-  str += F("<div class='align_center'><h2>ВЫБОР РЕЖИМА УПРАВЛЕНИЯ</h2></div><hr />");
+  str += F("ВЫБОР РЕЖИМА УПРАВЛЕНИЯ<hr />");
+
+  // *** Изменение режима управления
   str += F("<p><font class='ctrl_txt'> Режим управления: </font><font class='state'> ");
   if(ctrl == 0) str += F("АВТОМАТИЧЕСКИЙ");
   if(ctrl == 1) str += F("ДИСТАНЦИОННЫЙ");
@@ -851,9 +925,29 @@ void ctrl_mode(){
   str += F("<p><font class='ctrl_txt'> Изменить режим :</font><a href='/ctrl_mode_set?ctrl=rem'><button class='ctrl_mode'> ДИСТАНЦИОННЫЙ </button></a></p>");  
   str += F("<p><font class='ctrl_txt'></font><a href='/ctrl_mode_set?ctrl=auto'><button class='ctrl_mode'> АВТОМАТИЧЕСКИЙ </button></a></p>");
   str += F("<p><font class='ctrl_txt'></font><a href='/ctrl_mode_set?ctrl=man'><button class='ctrl_mode'> ВРУЧНУЮ </button></a></p>");
-  str += F("<hr/><br/>");
+  str += F("<hr/>");
+  
+  // *** Калибровка датчика влажности почвы
+  str += F("КАЛИБРОВКА ДАТЧИКА ВЛАЖНОСТИ ПОЧВЫ <hr/>");
+  str += F("<form  method='POST' action='/watering_adj'>");
+  str += F("<p><font class='sensors_txt'> Выход датчика : </font>");
+  str += F("<font class='sensors_value'>"); 
+  str += sensor_moist;
+  str += F(" ед. </font></p>");
+  str += F("<p><font class='sensors_txt'> на воздухе (0%) &nbsp = </font>");         
+  str += F("<input type='TEXT' class='set_val' name='air_val' placeholder=' ");
+  str += String(air_val);
+  str += F("\n'/> &nbsp ед.</p>");
+  str += F("<p><font class='sensors_txt'> в воде (100%) &nbsp = </font>");        
+  str += F("<input type='TEXT' class='set_val' name='water_val' placeholder=' ");
+  str += String(water_val);
+  str += F("\n'/> &nbsp ед. </p>");
+  str += F("<p><font class='set_txt'> </font><input type='SUBMIT' class='set_button' value='ПРИМЕНИТЬ ЗНАЧЕНИЯ'></p>");
+  str += F("</form><hr/><br/>");
+        
   str += F("<p><a href='/'><button class='home_button'> НА ГЛАВНЫЙ ЭКРАН </button></a></p>");
-  //str += F("</div>");         
+
+  
   str += F("</body>");
   str += F("</html>\n\r");
   server.send ( 200, "text/html", str );
@@ -864,9 +958,22 @@ void ctrl_mode(){
 void ctrl_mode_set() {
   if (server.arg(0)=="auto") ctrl = 0;
   //if (server.arg(0)=="rem" && client.connected())  ctrl = 1;
-  if (server.arg(0)=="rem")  ctrl = 1;
+  if (server.arg(0)=="rem") ctrl = 1;
   if (server.arg(0)=="man") ctrl = 2;
   server.send ( 200, "text/html", root_str );
+  delay(1000);
+}
+
+// *** Изменить значения калибровки ***
+void watering_adj() {
+  int set;
+  set = (server.arg(0)).toInt();
+  if (set != 0) air_val = set; 
+  if (air_val > 800)  air_val = 800;
+  set = (server.arg(1)).toInt();;
+  if (set != 0) water_val = set; 
+  if (water_val < 100)  water_val = 100;
+  server.send ( 200, "text/html", ctrl_str ); 
   delay(1000);
 }
 
@@ -939,7 +1046,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   // *** Сообщение прибыло в топик 
   Serial.print("Message arrived on topic: ");  
   Serial.print(topic);
-  Serial.print(". Message: ");  //  Сообщение: 
+  Serial.print(". Message: ");  //  ". Сообщение: "
   String message;
   for (int i=0;i<length;i++) {
     //Serial.print((char)payload[i]);
@@ -948,8 +1055,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.println(message);
 
   // *** Обработка сообщения 
-  if(topic=="BigGreenHouse/cmd/ventilation"){
-    rem_fan = (message == "1" || message == "true");
+  if(topic=="BigGreenHouse/cmd/watering"){
+    rem_valve = (message == "1" || message == "true");
   } 
 }
 
@@ -963,34 +1070,34 @@ void publishData() {
     if (step_mqtt_send == 0) event_mqtt_publish = millis();
  
     // *** ПОДГОТОВКА ДАННЫХ
-    static char pressure[10];
-    dtostrf(pres, 8, 2, pressure);
-    static char temperature[10];
-    dtostrf(temp, 8, 2, temperature);
-    static char humidity[10];
-    dtostrf(hum, 8, 2, humidity);
- 
+    static char moisture[10];
+    dtostrf(moist, 8, 2, moisture);
+         
     // *** ПУБЛИКАЦИЯ ПО ОДНОМУ СООБЩЕНИЮ ЗА ЦИКЛ   
     switch (step_mqtt_send) {
     case 0:    
-      client.publish("/BigGreenHouse/status/pressure", pressure);
-      Serial.print("MQTT client publish pressure = ");
-      Serial.println(pressure);
+      topic = "/BigGreenHouse/status/#" + String(n) + "_moisture";
+      client.publish(topic.c_str(), moisture);
+      Serial.print(topic);
+      Serial.print(" = ");
+      Serial.println(moisture);
       break;
-    case 1:    
-      client.publish("/BigGreenHouse/status/temperature", temperature);
-      Serial.print("MQTT client publish temperature = ");
-      Serial.println(temperature);
+    case 1:   
+      topic = "/BigGreenHouse/status/#" + String(n) + "_watering";
+      client.publish(topic.c_str(), String(valve_ctrl()).c_str());
+      Serial.print(topic);
+      Serial.print(" = ");
+      Serial.println(valve_ctrl());
       break;
-    case 2:    
-      client.publish("/BigGreenHouse/status/humidity", humidity);
-      Serial.print("MQTT client publish humidity = ");
-      Serial.println(humidity);
+    case 2:
+      topic = "/BigGreenHouse/status/#" + String(n) + "_sensor_error";  
+      client.publish(topic.c_str(), String(sensor_error).c_str());
+      Serial.print(topic);
+      Serial.print(" = ");
+      Serial.println(sensor_error);
       break;
     case 3:    
-      client.publish("/BigGreenHouse/status/ventilation", String(fan_ctrl()).c_str());
-      Serial.print("MQTT client publish fan_ctrl = ");
-      Serial.println(fan_ctrl());
+      //client.publish("/BigGreenHouse/.../...", ...);
       break;
     case 4:    
       //client.publish("/BigGreenHouse/.../...", ...);
@@ -1014,16 +1121,16 @@ void connect() {
   event_reconnect = millis();
   
   // *** ЕСЛИ ОТСУТСТВУЕТ ПОДКЛЮЧЕНИЕ К WiFi РОУТЕРУ - ПОДКЛЮЧИТЬСЯ 
-  if (WiFi.status() != WL_CONNECTED) {  // WiFi.status() == 3 : WL_CONNECTED
-    if (!sta_ok) sta_wifi();            // подключиться к роутеру, если ранее подключение к роутеру отсутствовало 
-    else WiFi.mode(WIFI_AP_STA);        // включить точку доступа, если соединение с роутером временно отсутствует
-    //else WiFi.softAP(ap_ssid, ap_pass);    
+  if (WiFi.status() != WL_CONNECTED) {   // WiFi.status() == 3 : WL_CONNECTED
+    if (!sta_ok) sta_wifi();              // подключиться к роутеру, если ранее подключение к роутеру отсутствовало 
+    //else WiFi.mode(WIFI_AP_STA);          // включить точку доступа, если соединение с роутером временно отсутствует
+    else WiFi.softAP(ap_ssid, ap_pass);    
   }
   else if (WiFi.localIP() == ip) {
     //WiFi.mode(WIFI_STA);                      // переключить в режим = только станция ... или ...
     WiFi.softAPdisconnect(true);            // отключить точку доступа ESP
   }  
-
+  
   // *** ЕСЛИ WiFi ЕСТЬ, НО ОТСУТСТВУЕТ ПОДКЛЮЧЕНИЕ К БРОКЕРУ - ПОДКЛЮЧИТЬСЯ 
   if (WiFi.isConnected() && !client.connected()) {
     Serial.print("Attempting MQTT connection...");  // Попытка подключиться к MQTT-брокеру... 
@@ -1031,11 +1138,11 @@ void connect() {
     // *** ПОСЛЕ ПОДКЛЮЧЕНИЯ К БРОКЕРУ ПОДПИСАТЬСЯ НА ТОПИК(-И) 
     //     функция client.connect(clientID) выполняет подключение clientID к брокеру
     //     возвращает : false = ошибка подключения / true = соединение выполнено успешно.
-    String mqtt_client = ap_ssid;
-    if (client.connect(mqtt_client.c_str())) {               
+    mqtt_client = ap_ssid;
+    if (client.connect(mqtt_client.c_str())) {    
       Serial.println("MQTT connected OK");
       client.setCallback(callback);
-      String topic = "BigGreenHouse/cmd/ventilation"
+      topic = "BigGreenHouse/cmd/#" + String(n) + "_watering";
       client.subscribe(topic.c_str());  // подписка на топики
       //client.subscribe("BigGreenHouse/....
       // ....
@@ -1052,7 +1159,7 @@ void connect() {
 void sta_wifi() {
   WiFi.disconnect(); 
   IPAddress dns2(8,8,8,8);
-  
+ 
   // *** STA WiFi - настройки и подключение к роутеру ***
   if (WiFi.getAutoConnect() != true) {    //configuration will be saved into SDK flash area
     WiFi.setAutoConnect(true);            //on power-on automatically connects to last used hwAP
@@ -1065,18 +1172,19 @@ void sta_wifi() {
   if (WiFi.status() != WL_CONNECTED) {
     ssid = "Keenetic-2927";
     pass = "dUfWKMTh";
-    ip = IPAddress(192,168,123,20);
+    ip = IPAddress(192,168,123,20+n);
     gw = IPAddress(192,168,123,1);
     mask = IPAddress(255,255,255,0);
+    mqtt_server = "192.168.123.222";
     mqtt_port = 1883;
     connect_wifi();
- }
+  }  
     
   // - WiHome -
   if (WiFi.status() != WL_CONNECTED) {
     ssid = "WiHome";
     pass = "Ktcyfz_l8F-50";
-    ip = IPAddress(192,168,50,20);
+    ip = IPAddress(192,168,50,20+n);
     gw = IPAddress(192,168,50,1);
     mask = IPAddress(255,255,255,0);
     mqtt_server = "192.168.50.222";
@@ -1127,16 +1235,26 @@ void connect_wifi() {
   Serial.println(WiFi.status());
 }
 
+//-----------------------------------------------------------------------------
+//  ОБРАБОТКА ПРЕРЫВАНИЯ ОТ ТАЙМЕРА ПОЛИВА - ЛОКАЛЬНАЯ КОМАНДА ОТКРЫТЬ КЛАПАН
+//-----------------------------------------------------------------------------
+void ICACHE_RAM_ATTR ISR_tmr_opn() {
+  if (ctrl==0 && !digitalRead(tmr_opn) && digitalRead(tmr_cls))   auto_valve = true;
+}
+
+//-----------------------------------------------------------------------------
+//  ОБРАБОТКА ПРЕРЫВАНИЯ ОТ ТАЙМЕРА ПОЛИВА - ЛОКАЛЬНАЯ КОМАНДА ЗАКРЫТЬ КЛАПАН
+//-----------------------------------------------------------------------------
+void ICACHE_RAM_ATTR ISR_tmr_cls() {
+  if (ctrl==0 && !digitalRead(tmr_cls) && digitalRead(tmr_opn))   auto_valve = false;
+}
 
 //-----------------------------------------------------------------------------
 //                          СТАРТОВАЯ ИНИЦИАЛИЗАЦИЯ 
 //-----------------------------------------------------------------------------
 void setup() {
-  
-  // *** SERIAL PORT
+  // Serial port
   Serial.begin(115200);
-  Serial.println();
-  delay (1000);
 
   // *** EEPROM
   EEPROM.begin(512);
@@ -1152,41 +1270,52 @@ void setup() {
   ch[len]='\0';
   eeprom_ok = (String(ch) == ap_ssid);
   
+  Serial.println ("=== EEPROM ===");
+  Serial.println (String(ch));
+  Serial.println (ap_ssid);
+  Serial.println (eeprom_ok);
+  
+  
   // *** GPIO MODE 
-  pinMode(fan, OUTPUT);  
+  pinMode(valve, OUTPUT);
   pinMode(ESP_BUILTIN_LED, OUTPUT);  
-  
-  // *** GPIO STATE 
-  //digitalWrite(tmr_rst, HIGH);
-  digitalWrite(fan, LOW);
-  digitalWrite(ESP_BUILTIN_LED, LOW);
+  pinMode(tmr_opn, INPUT_PULLUP); // ожидаение импульса низкого уровеня
+  pinMode(tmr_cls, INPUT_PULLUP); // ожидаение импульса низкого уровеня
+  //pinMode(tmr_rst, INPUT);  // вывод для рестарта таймера
 
-  // *** ИНИЦИАЛИЗАЦИЯ ОПРОСА BME280 ЧЕРЕЗ I2C
-  Wire.begin();
-  event_bme_begin = millis();
-  while(!bme.begin() && millis() - event_bme_begin < 5000); // ожидание подключения BME280
-  sensors_read();
-  
+  // *** GPIO STATE
+  //digitalWrite(tmr_rst, HIGH);
+  digitalWrite(valve, LOW); // ... или восстановить состояние из EEPROM ?
+  digitalWrite(ESP_BUILTIN_LED, LOW);
+  attachInterrupt(digitalPinToInterrupt(tmr_opn), ISR_tmr_opn, CHANGE);  // активировать прерывание от таймера полива 
+  attachInterrupt(digitalPinToInterrupt(tmr_cls), ISR_tmr_cls, CHANGE);  // активировать прерывание от таймера полива   
+
   // *** VARIABLE STATE 
   if (eeprom_ok) {
     byte state;
     EEPROM.get(114,ctrl);         // режим управления
     
     EEPROM.get(110,state);
-    man_fan = bitRead(state, 0);  // команда ручного режима для реле вентилятора
-    rem_fan = bitRead(state, 1);  // дистанционная команда для реле вентилятора 
-    auto_fan = bitRead(state, 2); // локальная команда для реле вентилятора
+    man_valve = bitRead(state, 0);  // команда ручного режима для реле клапана полива
+    rem_valve = bitRead(state, 1);  // дистанционная команда для реле клапана полива
+    auto_valve = bitRead(state, 2); // локальная команда для реле клапана полива
  
-    EEPROM.get(120,set_temp);     // уставка температуры для включения вентиляции
-    EEPROM.get(124,set_hum);     // уставка влажности для включения вентиляции
+    EEPROM.get(128,set_moist);    // уставка влажности почвы для отключения полива
+    EEPROM.get(132,air_val);      // уставка 0% для датчика влажности почвы
+    EEPROM.get(136,water_val);      // уставка 100% для датчика влажности почвы
   }
   else {
     ctrl = 0;         // режим: auto
-    rem_fan = false;  // дистанционная команда для реле вентилятора = выключить
-    auto_fan = false; // локальная команда для реле вентилятора = выключить
-    man_fan = false;  // команда ручного режима для реле вентилятора = выключить
+    rem_valve = false;  // дистанционная команда для реле клапана полива = выключить
+    auto_valve = false; // локальная команда для реле клапана полива = выключить
+    man_valve = false;  // команда ручного режима для реле клапана полива = выключить
   }
-          
+  watering_state = false;
+  first_watering = true;
+  
+  // *** ИНИЦИАЛИЗАЦИЯ ОПРОСА АНАЛОГОВОГО ДАТЧИКА
+  sensors_read();
+    
   // *** ИНИЦИАЛИЗАЦИЯ ТОЧКИ ДОСТУПА (WiFi_AP)
   WiFi.hostname(ap_ssid);     // DHCP Hostname (useful for finding device for static lease)
   WiFi.softAPConfig (ap_ip, ap_gateway, ap_subnet);  
@@ -1199,13 +1328,14 @@ void setup() {
    
   // *** WEB-СЕРВЕР
   http_server();  
-
+  
   Serial.println("Ready");  //  "Готово" 
   digitalWrite(ESP_BUILTIN_LED, HIGH);
   
   // *** ИНИЦИАЛИЗАЦИЯ ТАЙМЕРОВ СОБЫТИЙ
   mem = now();
   event_serial_output = millis();
+  watering_run = false;
 }
 
 //-----------------------------------------------------------------------------
@@ -1216,15 +1346,26 @@ void loop() {
   if (ctrl > 2) ctrl = 2;
   if (ctrl < 0) ctrl = 0;
 
-  if (ctrl == 0) man_fan = auto_fan;
-  if (ctrl == 1) man_fan = rem_fan;
-
-  // *** опрос датчика формирование локальных команд
+  if (ctrl != 2) man_valve = valve_ctrl(); // "безударный" переход в ручной режим
+ 
+  // *** опрос датчика и формирование локальных команд
   if((millis() - event_sensors_read) >= 60000) sensors_read();
 
-  // *** включение реле вентиляции
-  //digitalWrite(fan, fan_ctrl());
-  digitalWrite(fan, man_fan);
+  // *** включение реле клапана
+  //digitalWrite(valve, valve_ctrl());
+  digitalWrite(valve, man_valve);
+
+  // *** учет времени полива
+  if (digitalRead(valve) && !watering_state) {  // старт полива
+    start_watering = millis();
+    watering_state = true;
+  } 
+ 
+  if (!digitalRead(valve) && watering_state) {  // окончание полива
+    end_watering = millis();
+    watering_state = false;
+    first_watering = false;  // сброс при включении первого же полива
+  }
   
   // *** обработка запросов к WEB-серверу
   server.handleClient();
@@ -1244,8 +1385,8 @@ void loop() {
     event_serial_output = millis();
     Serial.print("ctrl = ");  
     Serial.println(ctrl);
-    if (!digitalRead(fan)) Serial.println("Реле вентилятора = ВЫКЛ.");  
-    if (digitalRead(fan)) Serial.println("Реле вентилятора = ВКЛ."); 
+    if (!digitalRead(valve)) Serial.println("Клапан полива = ЗАКР.");  
+    if (digitalRead(valve)) Serial.println("Клапан полива = ОТКР."); 
     
     WiFi.printDiag(Serial);
     //Serial.println("SSID : ");
@@ -1285,34 +1426,34 @@ void loop() {
   // *** ОБНОВИТЬ ЗНАЧЕНИЯ В EEPROM 
   char charBuf[100];
   ap_ssid.toCharArray(charBuf, 100);
+
+  Serial.print("0   charBuf = ");
+  Serial.println(charBuf);
+  
   EEPROM.put(0, charBuf);     
   EEPROM.put(114,ctrl);         // режим управления
   byte state = 0;
-  if (man_fan) state += 1;
-  if (rem_fan) state += 2;
-  if (auto_fan) state += 4;
+  if (man_valve) state += 1;
+  if (rem_valve) state += 2;
+  if (auto_valve) state += 4;
     
-  //Serial.print("110   state = ");
-  //Serial.println(state);
+  Serial.print("110   state = ");
+  Serial.println(state);
     
   EEPROM.put(110,state);
     
-  //Serial.print("120   set_temp = ");
-  //Serial.println(set_temp);
+  Serial.print("128   set_moist = ");
+  Serial.println(set_moist);
     
-  EEPROM.put(120,set_temp);     // уставка температуры для включения вентиляции
-
-  //Serial.print("124   set_hum = ");
-  //Serial.println(set_hum);
-    
-  EEPROM.put(124,set_hum);      // уставка влажности для включения вентиляции
+  EEPROM.put(128,set_moist);     // уставка влажности почвы
+  EEPROM.put(132,air_val);       // уставка 0% для датчика влажности почвы
+  EEPROM.put(136,water_val);     // уставка 100% для датчика влажности почвы
 
   EEPROM.commit();
   //if (EEPROM.commit()) {
-  //  Serial.println("EEPROM successfully committed");
+    //Serial.println("EEPROM successfully committed");
   //} 
   //else {
-  //  Serial.println("ERROR! EEPROM commit failed");
+    //Serial.println("ERROR! EEPROM commit failed");
   //}
-
 }
