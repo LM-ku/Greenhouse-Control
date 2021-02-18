@@ -1076,8 +1076,8 @@ void connect_wifi() {
   // - Keenetic-2927 - 
   if (WiFi.status() != 3) {
   // if (WiFi.isConnected() != true) {
-    ssid = "Keenetic-2927";
-    pass = "dUfWKMTh";
+    ssid = "";
+    pass = "";
     WiFi.config(IPAddress(192,168,123,20), IPAddress(192,168,123,1), IPAddress(255,255,255,0), IPAddress(192,168,123,1));
     mqtt_server = "192.168.123.222";
     mqtt_port = 1883;
@@ -1087,26 +1087,15 @@ void connect_wifi() {
   // - WiHome -
   if (WiFi.status() != 3) {
   // if (WiFi.isConnected() != true) {
-    ssid = "WiHome";
-    pass = "Ktcyfz_l8F-50";
+    ssid = "...";
+    pass = "...";
     WiFi.config(IPAddress(192,168,50,20), IPAddress(192,168,50,1), IPAddress(255,255,255,0), IPAddress(192,168,50,1));
     //WiFi.config(0, 0, 0, 0);
     mqtt_server = "192.168.50.222";
     mqtt_port = 1883;
     sta_wifi();
   }
-
-  // - ZyXEL01 -
-  if (WiFi.status() != 3) {
-  // if (WiFi.isConnected() != true) {
-    ssid = "ZyXEL01";
-    pass = "D3i@GP4%Id";
-    WiFi.config(0, 0, 0, 0);
-    mqtt_server = "192.168.1.222";
-    mqtt_port = 1883;
-    sta_wifi();
-  }
-
+  
   if (WiFi.status() == WL_CONNECTED) {
   // if (WiFi.isConnected()) {
     sta_ok = true;                            // подключение к роутеру состоялось
