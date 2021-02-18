@@ -1195,8 +1195,8 @@ void sta_wifi() {
 
   // - Keenetic-2927 -
   if (WiFi.status() != WL_CONNECTED) {
-    ssid = "Keenetic-2927";
-    pass = "dUfWKMTh";
+    ssid = "...";
+    pass = "...";
     ip = IPAddress(192, 168, 123, 20+n);
     gw = IPAddress(192, 168, 123, 1);
     mask = IPAddress(255, 255, 255, 0);
@@ -1207,24 +1207,12 @@ void sta_wifi() {
 
   // - WiHome -
   if (WiFi.status() != WL_CONNECTED) {
-    ssid = "WiHome";
-    pass = "Ktcyfz_l8F-50";
+    ssid = "...";
+    pass = "...";
     ip = IPAddress(192, 168, 50, 20+n);
     gw = IPAddress(192, 168, 50, 1);
     mask = IPAddress(255, 255, 255, 0);
     mqtt_server = "192.168.50.222";
-    mqtt_port = 1883;
-    connect_wifi();
-  }
-
-  // - ZyXEL01 -
-  if (WiFi.status() != WL_CONNECTED) {
-    ssid = "ZyXEL01";
-    pass = "D3i@GP4%Id";
-    ip = IPAddress(0, 0, 0, 0);
-    gw = IPAddress(0, 0, 0, 0);
-    mask = IPAddress(0, 0, 0, 0);
-    mqtt_server = "192.168.1.222";
     mqtt_port = 1883;
     connect_wifi();
   }
