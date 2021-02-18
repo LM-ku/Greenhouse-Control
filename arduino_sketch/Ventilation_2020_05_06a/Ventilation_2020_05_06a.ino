@@ -1078,8 +1078,8 @@ void sta_wifi() {
   
   // - WiHome -
   if (wifi_sta == 1) {
-    ssid = "WiHome";
-    pass = "Ktcyfz_l8F-50";
+    ssid = "...";
+    pass = "...";
     ip = IPAddress(192,168,50,20);
     gw = IPAddress(192,168,50,1);
     mask = IPAddress(255,255,255,0);
@@ -1090,8 +1090,8 @@ void sta_wifi() {
   
   // - Keenetic-2927 - 
   if (wifi_sta == 2) {
-    ssid = "Keenetic-2927";
-    pass = "dUfWKMTh";
+    ssid = "...";
+    pass = "...";
     ip = IPAddress(192,168,123,20);
     gw = IPAddress(192,168,123,1);
     mask = IPAddress(255,255,255,0);
