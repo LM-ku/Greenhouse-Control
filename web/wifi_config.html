@@ -1,0 +1,129 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <title>БОЛЬШАЯ ТЕПЛИЦА. СЕТЬ WiFi</title>
+  <meta charset='UTF-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
+  <link rel="stylesheet" href="style1.css">  
+</head>
+<body>
+  <div class='card'>
+  <h3 class="card-title">ВЫБОР СЕТИ WiFi</h3>  
+  <form method='POST' action='/save_wifi'>
+    <input type='hidden' name='return_url' value='%RETURN_URL%'> 
+    <div class='form-group'>
+      <label>SSID:</label>
+      <input type='text' id='ssid' name='ssid' placeholder='Select or type SSID' autocomplete='off'>
+      <div id='networkList' class='network-list'></div>
+      <div id='scanStatus' class='scan-status'></div>	
+    </div>    
+    <div class='form-group'>
+      <label>Password:</label>
+      <input type='password' name='password' placeholder='Enter WiFi password'>
+    </div>
+     <div class='buttons'>	 
+      <!--button type="button" id="refreshBtn" class='button primary'>REFRESH</button-->
+	  <button type="button" id="refreshBtn" class='button primary'>ПОИСК СЕТЕЙ</button>
+	  <div>
+         <!--button type='button' onclick='window.location.href="%RETURN_URL%"' class='button secondary'>CANCEL</button-->
+         <button type='button' onclick='window.location.href="%RETURN_URL%"' class='button secondary'>ОТМЕНА</button>
+        <button type='submit' class='button primary'>OK</button>
+	  </div>
+    </div>
+  </form>
+  </div>
+  <script>
+    let networks = [];
+    let isScanning = false;
+
+    function showNetworks() {
+      const list = document.getElementById('networkList');
+      if (networks.length > 0 && !isScanning) {
+        list.style.display = 'block';
+      }
+    }
+
+    function hideNetworks() {
+      setTimeout(() => {
+        document.getElementById('networkList').style.display = 'none';
+      }, 200);
+    }
+
+    function selectNetwork(ssid) {
+      document.getElementById('ssid').value = ssid;
+      hideNetworks();
+    }
+
+    function updateNetworkList() {
+      const list = document.getElementById('networkList');
+      list.innerHTML = '';
+      networks.forEach(n => {
+        const div = document.createElement('div');
+        div.className = 'network-item';
+        div.textContent = `${n.ssid || '*****'} (${n.rssi} dBm, ch.${n.channel})`;
+        div.onclick = () => selectNetwork(n.ssid);
+        list.appendChild(div);
+      });
+    }
+
+    function showScanStatus(message) {
+      const status = document.getElementById('scanStatus');
+      status.textContent = message;
+      status.style.display = 'block';
+    }
+
+    function hideScanStatus() {
+      document.getElementById('scanStatus').style.display = 'none';
+    }
+
+    function startScan() {
+      if (isScanning) return;
+      isScanning = true;
+      showScanStatus('Scanning...');
+      networks = [];
+      updateNetworkList();
+
+      fetch('/scan')
+        .then(response => response.json())
+        .then(data => {
+          if(Array.isArray(data)) {
+            networks = data;
+            isScanning = false;
+            hideScanStatus();
+            updateNetworkList();
+          } else if(data.status === 'scanning') {
+            setTimeout(checkScanStatus, 1000);
+          }
+        })
+        .catch(error => {
+          console.error('Scan error:', error);
+          isScanning = false;
+          showScanStatus('Scan failed. Try again.');
+          setTimeout(hideScanStatus, 3000);
+        });
+    }
+
+    function checkScanStatus() {
+      fetch('/scan')
+        .then(response => response.json())
+        .then(data => {
+          if(Array.isArray(data)) {
+            networks = data;
+            isScanning = false;
+            hideScanStatus();
+            updateNetworkList();
+          } else if(data.status === 'scanning') {
+            setTimeout(checkScanStatus, 1000);
+          }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      startScan();
+      document.getElementById('ssid').addEventListener('focus', showNetworks);
+      document.getElementById('ssid').addEventListener('blur', hideNetworks);
+      document.getElementById('refreshBtn').addEventListener('click', startScan);
+    });
+  </script>
+</body>
+</html>

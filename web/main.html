@@ -1,0 +1,179 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<title>БОЛЬШАЯ ТЕПЛИЦА</title> 
+  <meta charset='UTF-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
+  <link rel='icon' href='data:,'>
+  <link rel='stylesheet' href='style.css'>
+</head>
+<body>
+  <div class='card'>
+ 	<span class='data-time' id='date_time'>%DATE_TIME%</span> 
+    <h3 class='card-title'>ИНФОРМАЦИЯ</h3>
+    <table class='info-table'>
+      <tr>
+        <td>Атмосферное давление:</td>
+        <td><span id='air_p'>%AIR_P%</span>&emsp; мм.рт.ст </td>
+      </tr>
+      <tr>
+        <td>Отн.влажность воздуха:</td>
+        <td><span id='air_h'>%AIR_H%</span>&emsp; &#37; </td>
+      </tr>
+      <tr>
+        <td>Температура воздуха:</td>
+        <td><span id='air_t'>%AIR_T%</span>&emsp; &deg;C </td>
+      </tr>
+	</table>   
+	<span id='a_in_sns'>%A_IN_SNS%</span>
+	<span id='one_wire_sns'>%ONE_WIRE_SNS%</span>
+  </div>
+  
+  <div class='card'>
+    <h3 class='card-title'>УПРАВЛЕНИЕ</h3>	
+      <div class='form-group'>
+        <label>Вентиляция в теплице (режим <span id='vent_mode'>%VENT_MODE%</span>):</label>
+		<form action='/ventilation'><button id='vent_state' class='button primary large'>%VENT_STATE%</button></form>
+      </div> 	
+     <div class='form-group'>
+        <label>Насос гидропоники (режим <span id='pump_mode'>%PUMP_MODE%</span>):</label>
+		<td><form action='/hydroponics'><button id='pump_state' class='button primary large'>%PUMP_STATE%</button></form>
+      </div> 	
+     <div class='form-group'>
+        <label>Клапан полива 1 (режим <span id='watering1_mode'>%WATERING1_MODE%</span>):</label>
+		<form action='/watering1'><button id='watering1_state' class='button primary large'>%WATERING1_STATE%</button></form>
+      </div> 	
+     <div class='form-group'>
+        <label>Клапан полива 2 (режим <span id='watering2_mode'>%WATERING2_MODE%</span>):</label>
+		<form action='/watering2'><button id='watering2_state' class='button primary large'>%WATERING2_STATE%</button></form>
+      </div> 	
+  </div>
+
+  <div class='card'>
+    <h3 class='card-title'>ПОДКЛЮЧЕНИЯ</h3>
+	
+      <div class='form-group'>
+        <label>Подключение к сети WiFi:</label>
+		<div class='value' id='wifi_state'>%WIFI_STATE%</div>			
+      </div> 
+	  
+      <div class='form-group'>
+        <span id='get_ip'>%GET_IP%</span>
+      </div>
+	  
+      <div class='form-group'>
+        <label>Точка доступа:</label>
+		<div class='value' id='ap_state'>%AP_STATE%</div>
+      </div> 
+	  
+      <div class='form-group'>
+        <label>Сервер времени NTP:</label>
+		<div class='value' id='ntp_state'>%NTP_STATE%</div>
+      </div> 
+	  
+      <div class='form-group'>
+        <label>MQTT брокер:</label>
+		<div class='value' id='mqtt_state'>%MQTT_STATE%</div>
+      </div> 
+	  
+      <!--div class='form-group'>
+        <label>Контроллер управления поливом Aquarius:</label>
+		<div class='value' id='aquarius_state'>%AQUARIUS_STATE%</div>
+      </div--> 
+	  
+	  <span id='aquarius_state'>%AQUARIUS_STATE%</span>
+	  
+	</div>	
+
+	<form action='/settings'>
+	  <button class='button primary large' style='font-size:0.9rem'>%VERSION_FW%</button>
+	</form>
+
+	<span id='logout_btn'>%LOGOUT_BTN%</span>
+
+  <script>
+
+  if (!!window.EventSource) {
+	var source = new EventSource('/events');
+	  
+	source.addEventListener('date_time', function(e) {
+	  document.getElementById("date_time").innerHTML = e.data;
+	}, false);
+	
+	source.addEventListener('vent_mode', function(e) {
+	  document.getElementById("vent_mode").innerHTML = e.data;
+	}, false);
+	
+	source.addEventListener('vent_state', function(e) {
+	  document.getElementById("vent_state").innerHTML = e.data;
+	}, false);
+
+	source.addEventListener('pump_mode', function(e) {
+	  document.getElementById("pump_mode").innerHTML = e.data;
+	}, false);
+
+	source.addEventListener('pump_state', function(e) {
+	  document.getElementById("pump_state").innerHTML = e.data;
+	}, false);
+	
+	source.addEventListener('watering1_mode', function(e) {
+	  document.getElementById("watering1_mode").innerHTML = e.data;
+	}, false);	
+	
+	source.addEventListener('watering1_state', function(e) {
+	  document.getElementById("watering1_state").innerHTML = e.data;
+	}, false);	
+	
+	source.addEventListener('watering2_mode', function(e) {
+	  document.getElementById("watering2_mode").innerHTML = e.data;
+	}, false);	
+	
+	source.addEventListener('watering2_state', function(e) {
+	  document.getElementById("watering2_state").innerHTML = e.data;
+	}, false);	
+	
+	source.addEventListener('air_p', function(e) {
+	  document.getElementById("air_p").innerHTML = e.data;
+	}, false);
+	
+	source.addEventListener('air_h', function(e) {
+	  document.getElementById("air_h").innerHTML = e.data;
+	}, false);
+	
+	source.addEventListener('air_t', function(e) {
+	  document.getElementById("air_t").innerHTML = e.data;
+	}, false);
+	
+	source.addEventListener('a_in_sns', function(e) {
+	  document.getElementById("a_in_sns").innerHTML = e.data;
+	}, false);
+	
+	source.addEventListener('one_wire_sns', function(e) {
+	  document.getElementById("one_wire_sns").innerHTML = e.data;
+	}, false);
+
+	source.addEventListener('wifi_state', function(e) {
+	  document.getElementById("wifi_state").innerHTML = e.data;
+	}, false);
+
+	source.addEventListener('get_ip', function(e) {
+	  document.getElementById("get_ip").innerHTML = e.data;
+	}, false);
+
+	source.addEventListener('mqtt_state', function(e) {
+	  document.getElementById("mqtt_state").innerHTML = e.data;
+	}, false);
+
+	source.addEventListener('aquarius_state', function(e) {
+	  document.getElementById("aquarius_state").innerHTML = e.data;
+	}, false);
+
+	source.addEventListener('logout_btn', function(e) {
+	  document.getElementById("logout_btn").innerHTML = e.data;
+	}, false);
+
+  } 
+   
+</script>
+</body>
+</html>  

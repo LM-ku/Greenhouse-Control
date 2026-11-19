@@ -1,0 +1,165 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <title>БОЛЬШАЯ ТЕПЛИЦА. ПОЛИВ 1</title>
+  <meta charset='UTF-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
+  <link rel='icon' href='data:,'>
+  <link rel='stylesheet' href='style.css'>
+  
+ <style>
+	.days-grid {
+      display: grid;
+      grid-template-columns: 120px repeat(7, 1fr);
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    .days-label {
+      grid-column: 1;
+    }
+    .day-header {
+      text-align: center;
+      font-weight: bold;
+      font-size: 0.9em;
+      padding-bottom: 5px;
+    }
+    .day-checkbox {
+      text-align: center;
+    }
+  </style>  
+  
+</head>
+<body>
+  <div class='card'>
+    <span class='data-time' id='date_time'>%DATE_TIME%</span>
+    <h3 class='card-title'>КЛАПАН ПОЛИВА 1. ИНФОРМАЦИЯ</h3>
+    <table class='info-table'>
+      <tr>
+        <td>Состояние:</td>
+        <td><span id='watering1_state'>%WATERING1_STATE%</span></td>
+      </tr>	  
+	</table>
+  </div>
+  
+  <div class='card'>
+    <h3 class='card-title'>КЛАПАН ПОЛИВА 1. УПРАВЛЕНИЕ</h3>
+    <div class='form-group'>
+      <label>Режим работы:</label>
+	  <form action='/watering1_mode_set' style="display:inline">
+	    <button id='/watering1_mode' class='button primary large'>%WATERING1_MODE%</button>
+	  </form>
+    </div>
+	<span id='watering1_man'>
+	  %WATERING1_MAN%
+	  <!--div class='button-group'>
+        <form action='/watering1_off' style='flex:1'><button class='button cancel large'>ВЫКЛЮЧИТЬ</button></form>
+		<form action='/watering1_on' style='flex:1'><button class='button execute large'>ВКЛЮЧИТЬ</button></form>
+      </div-->
+	</span>
+  </div>
+
+  <div class='card'>
+    <h3 class='card-title'>НАСТРОЙКИ РЕЖИМА "АВТО"</h3>
+    <!--form action='/watering1' method='POST' style="width:100 &#37;"-->
+    <form action='/watering1' method='POST' class="large">  
+
+      <div class='form-row'>
+        <div class='form-label'>Канал контроллера 'Aquarius' (7 ... 9)</div>
+        <input type='number' name='W1_AQUARIUS_CH' class='value-input' pattern='[0,7-9]{1}' value='%W1_AQUARIUS_CH%'>
+        <span>, иначе ...</span>
+      </div>
+
+      <!-- Сетка с днями недели -->
+      <div class="days-grid">
+        <!-- Пустая ячейка для выравнивания -->
+        <div class="days-label"></div>
+        
+        <!-- Заголовки дней -->
+        <div class="day-header">ПН</div>
+        <div class="day-header">ВТ</div>
+        <div class="day-header">СР</div>
+        <div class="day-header">ЧТ</div>
+        <div class="day-header">ПТ</div>
+        <div class="day-header">СБ</div>
+        <div class="day-header">ВС</div>
+        
+        <!-- Чекбоксы -->
+        <div class="days-label">Дни полива:</div>
+        <div class="day-checkbox"><input type="checkbox" name="mon" id="mon"></div>
+        <div class="day-checkbox"><input type="checkbox" name="tue" id="tue"></div>
+        <div class="day-checkbox"><input type="checkbox" name="wed" id="wed"></div>
+        <div class="day-checkbox"><input type="checkbox" name="thu" id="thu"></div>
+        <div class="day-checkbox"><input type="checkbox" name="fri" id="fri"></div>
+        <div class="day-checkbox"><input type="checkbox" name="sat" id="sat"></div>
+        <div class="day-checkbox"><input type="checkbox" name="sun" id="sun"></div>
+      </div>
+ 
+      <div class='form-row'>
+        <div class='form-label'>Начинать полив в</div>
+        <div class='time-inputs'>
+          <input type='number' name='W1_START_HOUR' class='time-input' value='%W1_START_HOUR%'>
+          <span>ч</span>
+          <input type='number' name='W1_START_MINUTE' class='time-input' value='%W1_START_MINUTE%'>
+          <span>м</span>
+        </div>
+      </div>
+
+      <div class='form-row'>
+        <div class='form-label'>Продолжительность полива</div>
+        <input type='number' name='W1_RUN_TIME' class='value-input' value='%W1_RUN_TIME%'>
+        <span>минут</span>
+      </div>
+
+      <div class='button-group'>
+        <button type='button'  onclick='window.location.reload()' class='button secondary'>ОТМЕНА</button>
+        <button type='submit' class='button primary'>СОХРАНИТЬ</button> 
+	  </div>
+
+     </form>
+  </div>
+
+  <div class='button-group'>
+    <form action='/' style='flex:1'>
+      <button class='button primary large'>НА ГЛАВНЫЙ ЭКРАН</button>
+    </form>
+  </div>
+
+<script>
+
+  fetch('/w1_getdays')
+    .then(r => r.text())
+    .then(mask => {
+      const bits = parseInt(mask);
+      if (bits & 1) document.getElementById('mon').checked = true;
+      if (bits & 2) document.getElementById('tue').checked = true;
+      if (bits & 4) document.getElementById('wed').checked = true;
+      if (bits & 8) document.getElementById('thu').checked = true;
+      if (bits & 16) document.getElementById('fri').checked = true;
+      if (bits & 32) document.getElementById('sat').checked = true;
+      if (bits & 64) document.getElementById('sun').checked = true;
+    });
+
+  if (!!window.EventSource) {
+	var source = new EventSource('/events');
+	  
+	source.addEventListener('date_time', function(e) {
+	  document.getElementById("date_time").innerHTML = e.data;
+	}, false);
+	
+	source.addEventListener('watering1_state', function(e) {
+	  document.getElementById("watering1_state").innerHTML = e.data;
+	}, false);
+	
+	source.addEventListener('watering1_mode', function(e) {
+	  document.getElementById("watering1_mode").innerHTML = e.data;
+	}, false);
+	
+	source.addEventListener('watering1_man', function(e) {
+	  document.getElementById("watering1_man").innerHTML = e.data;
+	}, false);	
+	
+  } 
+    	
+</script>
+</body>
+</html>

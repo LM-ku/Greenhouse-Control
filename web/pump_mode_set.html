@@ -1,0 +1,58 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<title>БОЛЬШАЯ ТЕПЛИЦА</title>
+<meta charset='UTF-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<link rel='icon' href='data:,'>
+<link rel='stylesheet' type='text/css' href='style.css'>
+</head>
+<body>
+  <div class='card'>
+ 	<!--span class='data-time' id='date_time'>%DATE_TIME%</span--> 
+    <h3 class='card-title'>НАСОС ГИДРОПОНИКИ</h3>
+    <table class='info-table'>
+      <tr>
+        <td>Актуальный режим работы:</td>
+        <td><span id='pump_mode'>%PUMP_MODE%</span></td>
+      </tr>	
+	</table>
+  </div> 	
+	
+  <div class='card'>
+    <h3 class='card-title'>ВЫБОР РЕЖИМА РАБОТЫ</h3> 
+  	<div class='form-group'>
+		<form action='/pump_mode_set' method='POST'>
+		  <input type='HIDDEN' name="MODE" value="0">
+		  <button type='SUBMIT' class='button primary large'>АВТО</button>
+		</form>
+    </div> 	
+  	<div class='form-group'>
+	  <form action='/pump_mode_set' method='POST'>
+		<input type='HIDDEN' name="MODE" value="1">
+		<button type='SUBMIT' class='button primary large'>ДИСТАНЦИОННЫЙ</button>
+	  </form>
+    </div> 	  
+  	<div class='form-group'>
+		<form action='/pump_mode_set' method='POST'>
+		  <input type='HIDDEN' name="MODE" value="2">
+		  <button type='SUBMIT' class='button primary large'>ВРУЧНУЮ</button>
+		</form>
+    </div> 	    
+ 	<form action='/hydroponics'>
+      <button class='button secondary large'>НАЗАД</button>
+	</form>		
+  </div>
+<script>
+
+  if (!!window.EventSource) {
+	var source = new EventSource('/events');
+	  
+	source.addEventListener('pump_mode', function(e) {
+	  document.getElementById("pump_mode").innerHTML = e.data;
+	}, false);
+  }
+
+</script> 
+</body>
+</html>

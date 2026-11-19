@@ -1,0 +1,186 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <title>БОЛЬШАЯ ТЕПЛИЦА. ВЕНТИЛЯЦИЯ</title>
+  <meta charset='UTF-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
+  <link rel='icon' href='data:,'>
+  <link rel='stylesheet' href='style.css'>
+</head>
+<body>
+  <div class='card'>
+    <span class='data-time' id='date_time'>%DATE_TIME%</span>
+    <h3 class='card-title'>ВЕНТИЛЯЦИЯ. ИНФОРМАЦИЯ</h3>
+    <table class='info-table'>
+      <tr>
+        <td>Атмосферное давление:</td>
+        <td><span id='bme_p'>%BME_P%</span>&emsp; мм.рт.ст </td>
+      </tr>
+      <tr>
+        <td>Отн.влажность воздуха:</td>
+        <td><span id='bme_h'>%BME_H%</span>&emsp; &#37; </td>
+      </tr>
+      <tr>
+        <td>Температура воздуха:</td>
+        <td><span id='bme_t'>%BME_T%</span>&emsp; &deg;C </td>
+      </tr>
+	  <tr>
+        <td>Вентиляция:</td>
+        <td><span id='vent_state'>%VENT_STATE%</span></td>
+      </tr>	  
+	</table>   	
+  </div>
+
+  <div class='card'>
+    <h3 class='card-title'>ВЕНТИЛЯЦИЯ. УПРАВЛЕНИЕ</h3>
+    <div class='form-group'>
+      <label>Режим работы:</label>
+	  <form action='/vent_mode_set' style="display:inline">
+        <button id='vent_mode' class='button primary large'>%VENT_MODE%</button>
+	  </form>
+    </div>
+	<span id='vent_man'>
+	  %VENT_MAN%	
+	  <!--div class='button-group'>
+        <form action='/ventilation_on' style='flex:1'><button class='button execute large'>ВКЛЮЧИТЬ</button></form>
+		<form action='/ventilation_off' style='flex:1'><button class='button cancel large'>ВЫКЛЮЧИТЬ</button></form>
+      </div-->
+	</span>
+  </div>
+  
+  <div class='card'>
+    <h3 class='card-title'>НАСТРОЙКИ РЕЖИМА "АВТО"</h3>
+    <!--form action='/ventilation' method='POST' style="width:100 &#37;"-->
+    <form action='/ventilation' method='POST' class="large"> 
+      
+      <div class='form-row'>
+        <div class='form-label'>Начинать работу:</div>
+        <div class='time-inputs'>
+          <input type='number' name='V_START_HOUR' class='time-input' value='%V_START_HOUR%'>
+          <span>ч.</span>
+          <input type='number' name='V_START_MINUTE' class='time-input' value='%V_START_MINUTE%'>
+          <span>мин.</span>
+        </div>
+      </div>
+      
+      <div class='form-row'>
+        <div class='form-label'>Закончить работу:</div>
+        <div class='time-inputs'>
+          <input type='number' name='V_END_HOUR' class='time-input' value='%V_END_HOUR%'>
+          <span>ч.</span>
+          <input type='number' name='V_END_MINUTE' class='time-input' value='%V_END_MINUTE%'>
+          <span>мин.</span>
+        </div>
+      </div>
+      
+      <div class='form-row'>
+        <div class='form-label'>Температура:</div>
+        <input type='number' name='SET_TEMP' class='value-input' value='%SET_TEMP%'>
+        <span class='input-hint'>+/- 1.0 &deg;C</span>
+      </div>
+      
+      <div class='form-row'>
+        <div class='form-label'>Влажность воздуха:</div>
+        <input type='number' name='SET_HUM' class='value-input' value='%SET_HUM%'>
+        <span class='input-hint'>+/- 10 &#37;</span>
+      </div>
+      
+      <div style="margin-top:20px; text-align:center">
+        <button type='submit' class='button primary'>СОХРАНИТЬ</button>
+      </div>
+    </form>
+  </div>
+ 
+  <div class='button-group'>
+    <form action='/' style='flex:1'>
+      <button class='button primary large'>НА ГЛАВНЫЙ ЭКРАН</button>
+    </form>
+  </div>
+
+  <script>
+    setInterval(function() {
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+          document.getElementById('date_time').innerHTML = this.responseText;
+        }
+      };
+      xhttp.open("GET", "/date_time", true);
+      xhttp.send();
+    }, 1000);
+
+    setInterval(function() {
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+          document.getElementById('vent_state').innerHTML = this.responseText;
+        }
+      };
+      xhttp.open("GET", "/vent_state", true);
+      xhttp.send();
+    }, 1000);
+    
+    setInterval(function() {
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+          document.getElementById('vent_mode').innerHTML = this.responseText;
+        }
+      };
+      xhttp.open("GET", "/vent_mode", true);
+      xhttp.send();
+    }, 1000);
+    
+    setInterval(function() {
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+          document.getElementById('vent_man').innerHTML = this.responseText;
+        }
+      };
+      xhttp.open("GET", "/vent_man", true);
+      xhttp.send();
+    }, 1000);
+    
+    setInterval(function() {
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+          document.getElementById('bme_p').innerHTML = this.responseText;
+        }
+      };
+      xhttp.open("GET", "/bme_p", true);
+      xhttp.send();
+    }, 10000);
+    
+    setInterval(function() {
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+          document.getElementById('bme_h').innerHTML = this.responseText;
+        }
+      };
+      xhttp.open("GET", "/bme_h", true);
+      xhttp.send();
+    }, 10000);
+    
+    setInterval(function() {
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+          document.getElementById('bme_t').innerHTML = this.responseText;
+        }
+      };
+      xhttp.open("GET", "/bme_t", true);
+      xhttp.send();
+    }, 10000);
+
+    function homeButton() {
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", "logout", true);
+      xhr.send();
+      setTimeout(function(){ window.open("/","_self"); }, 1000);
+    };
+  </script>
+</body>
+</html>

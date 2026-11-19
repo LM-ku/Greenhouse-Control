@@ -1,0 +1,301 @@
+/* ОБЩИЙ СТИЛЬ ОФОРМЛЕНИЯ */
+
+:root {
+/*  --primary-color: #2c7a4d; */
+  --primary-color: #308446
+/* --secondary-color: #4a5568; */
+  --secondary-color: #050505;
+  --accent-color: #38a169;
+  --border-color: #e2e8f0;
+  --bg-color: #f7fafc;
+  --text-color: #2d3748;
+  --value-color: #ffffff;
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  max-width: 450px;
+  margin: 0 auto;
+  padding: 15px;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.data-time {
+  display: block;
+  text-align: center;
+  font-size: 0.85em;
+  color: var(--secondary-color);
+  margin-bottom: 10px;
+}
+
+.card {
+  background: white;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 15px;
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--border-color);
+}
+
+.card-title {
+  color: var(--primary-color);
+  margin-top: 0;
+  margin-bottom: 15px;
+  text-align: center;  
+  font-size: 1.1em;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+}
+
+.large {
+  width: 100%;
+}
+
+.info-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.info-table td {
+  padding: 8px 5px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.info-table td:first-child {
+  font-weight: 500;
+  color: var(--secondary-color);
+  width: 60%;
+}
+
+.error {
+  color: red; 
+  margin-top: 10px;
+}
+
+.form-group {
+  margin-bottom: 15px;
+  position: relative;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+  font-size: 0.9em;
+  color: var(--secondary-color);
+}
+
+.form-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  width: 100%;
+ }
+ 
+.form-label {
+  width: 160px;
+  flex-shrink: 0;
+}
+.time-inputs {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+}
+.time-input {
+  width: 70px;
+  text-align: center;
+}
+.value-input {
+  width: 70px;
+  text-align: center;
+  margin-right: 10px;
+}
+.input-hint {
+  white-space: nowrap;
+}
+
+input, select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  text-align: center;
+  font-size: 0.95em;
+  transition: border-color 0.2s;
+  max-width: 100%;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+/* КНОПКИ, ГРУППЫ КНОПОК */
+
+.buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+}
+
+.button {
+  padding: 10px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin: 8px 0;
+  text-align: center;
+  font-size: 0.95em;
+  min-width: 20%;
+}
+
+.button:active {
+  position:relative;
+  top:2px;
+}
+
+.button.primary {
+  background: #006778;
+  color: white;
+}
+
+.button.secondary, .button.cancel {
+  background: #666;
+  color: white;
+}
+
+.button.success, .button.execute {
+  background: #4CAF50;
+  color: white;
+}
+
+.button-group {
+  display: flex;
+  width: 100%;
+  gap: 10px;
+  margin: 15px 0;
+}
+
+.button-group .button {
+  flex: 1;
+  margin: 0;
+}
+
+/* ЗНАЧЕНИЯ */
+
+.value {
+  text-align: center;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  text-align: center;
+  font-size: 0.95em;
+  transition: border-color 0.2s;
+  max-width: 100%;   
+}
+
+/* ВЕРСИЯ ПО */
+
+.version-info {
+  text-align: center;
+/*  font-size: 0.85em; */
+  font-weight: 650;
+  color: var(--secondary-color);
+  margin: 15px 0;
+}
+
+hr {
+  border: 0;
+  height: 1px;
+  background-color: var(--border-color);
+  margin: 15px 0;
+}
+
+/* WIFI SETUP */
+
+.network-list {
+  position:absolute; 
+  width:100%; 
+  max-height:200px; 
+  overflow-y:auto; 
+  background:white; 
+  z-index:1000; 
+  display:none; 
+  border:1px solid #ddd; 
+  border-top:none;
+}
+
+.network-item {
+  padding:8px; 
+  cursor:pointer;
+}
+
+.network-item:hover {
+  background:#f0f0f0;
+}
+
+.scan-status {
+  color: #666;
+  font-style: italic;
+  font-size: 13px;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 10%;
+  opacity: 0.9;
+  padding: 5px 0;
+  display: none;
+  text-align: right;
+  z-index: 1001;
+  pointer-events: none;
+}
+
+/* СТИЛИ ДЛЯ ФОРМЫ ОБНОВЛЕНИЯ ПО */
+.file-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.file-input-display {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.95em;
+  background-color: white;
+  cursor: pointer;
+  color: var(--secondary-color);
+}
+
+.file-input-hidden {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.file-input-display:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+

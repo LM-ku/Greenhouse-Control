@@ -1,0 +1,146 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <title>БОЛЬШАЯ ТЕПЛИЦА. ОБНОВЛЕНИЕ</title>
+  <meta charset='UTF-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
+  <link rel='icon' href='data:,'>
+  <link rel='stylesheet' href='style.css'>
+  <style>
+    #progress { margin-top: 15px; font-weight: 500; min-height: 1.5em; }
+    #progress.success { color: #28a745; }
+    #progress.error { color: #dc3545; }
+    #progress.active { color: var(--state-color, #007bff); }
+    .progress-bar {
+      width: 100%; height: 8px; background: #e9ecef; border-radius: 4px;
+      overflow: hidden; margin-top: 8px; display: none;
+    }
+    .progress-fill {
+      height: 100%; background: var(--state-color, #007bff);
+      width: 0%; transition: width 0.2s;
+    }
+  </style>
+</head>
+<body>
+  <div class='card'>
+    <h3 class='card-title'>ОБНОВЛЕНИЕ ПО</h3>
+    
+    <!-- Форма без enctype и без стандартного сабмита -->
+    <div id='updateForm'>
+      <div class='form-group'>
+        <label>Файл обновления:</label>
+        <div class='file-input-wrapper'>
+          <input type='text' class='file-input-display' id='fileInputDisplay' placeholder='Файл не выбран' readonly>
+          <input type='file' id='upload' class='file-input-hidden' accept='.bin,.bin.gz' onchange='updateFileName(this)'/>
+        </div>
+      </div>
+    </div>
+    
+    <div id='progress'></div>
+    <div class='progress-bar' id='progressBar'><div class='progress-fill' id='progressFill'></div></div>
+    
+    <div class='buttons'>
+      <button type='button' id='cancelBtn' class='button secondary' onclick='window.location.href="/settings"'>ОТМЕНА</button>
+      <button type='button' id='uploadBtn' class='button success' onclick='uploadFirmware()'>ОК</button>
+    </div>
+  </div>
+
+  <script>
+    var uploading = false;
+
+    function updateFileName(input) {
+      const display = document.getElementById('fileInputDisplay');
+      if (input.files.length > 0) {
+        display.value = input.files[0].name;
+        display.style.color = 'var(--text-color)';
+      } else {
+        display.value = '';
+        display.placeholder = 'Файл не выбран';
+      }
+    }
+
+    function uploadFirmware() {
+      if (uploading) return;
+      
+      const fileInput = document.getElementById('upload');
+      const progress = document.getElementById('progress');
+      const progressBar = document.getElementById('progressBar');
+      const progressFill = document.getElementById('progressFill');
+      const uploadBtn = document.getElementById('uploadBtn');
+      const cancelBtn = document.getElementById('cancelBtn');
+
+      if (fileInput.files.length === 0) {
+        progress.className = 'error';
+        progress.innerText = '❌ Сначала выберите файл прошивки (.bin)';
+        return;
+      }
+
+      const file = fileInput.files[0];
+      
+      // Проверка, что выбран .bin файл
+      if (!file.name.toLowerCase().endsWith('.bin')) {
+        progress.className = 'error';
+        progress.innerText = '❌ Файл должен иметь расширение .bin';
+        return;
+      }
+
+      uploading = true;
+      uploadBtn.disabled = true;
+      cancelBtn.disabled = true;
+      progress.className = 'active';
+      progress.innerText = 'Подготовка к загрузке...';
+      progressBar.style.display = 'block';
+      progressFill.style.width = '0%';
+
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '/update_raw', true);
+      // 🔑 КЛЮЧЕВОЙ МОМЕНТ: отказ от multipart/form-data
+      xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+      xhr.setRequestHeader('X-Filename', file.name);
+
+      xhr.upload.onprogress = function(e) {
+        if (e.lengthComputable) {
+          var percent = (e.loaded / e.total) * 100;
+          progressFill.style.width = percent + '%';
+          progress.innerText = 'Загрузка: ' + percent.toFixed(1) + '% (' + 
+                               Math.round(e.loaded/1024) + ' / ' + Math.round(e.total/1024) + ' КБ)';
+        }
+      };
+
+      xhr.onload = function() {
+        if (xhr.status === 200 && xhr.responseText === 'OK') {
+          progress.className = 'success';
+          progress.innerText = '✅ Обновление успешно! Устройство перезагружается...';
+          progressFill.style.width = '100%';
+          setTimeout(function(){ window.location.href='/'; }, 15000);
+        } else {
+          progress.className = 'error';
+          progress.innerText = '❌ Ошибка обновления: ' + xhr.responseText;
+          uploading = false;
+          uploadBtn.disabled = false;
+          cancelBtn.disabled = false;
+        }
+      };
+
+      xhr.onerror = function() {
+        progress.className = 'error';
+        progress.innerText = '❌ Потеряно соединение с устройством';
+        uploading = false;
+        uploadBtn.disabled = false;
+        cancelBtn.disabled = false;
+      };
+
+      xhr.ontimeout = function() {
+        progress.className = 'error';
+        progress.innerText = '❌ Превышено время ожидания';
+        uploading = false;
+        uploadBtn.disabled = false;
+        cancelBtn.disabled = false;
+      };
+
+      xhr.timeout = 300000; // 5 минут таймаут
+      xhr.send(file);
+    }
+  </script>
+</body>
+</html>
