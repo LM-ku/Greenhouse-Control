@@ -1,0 +1,547 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<title>БОЛЬШАЯ ТЕПЛИЦА</title> 
+  <meta charset='UTF-8'>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
+  <link rel='icon' href='data:,'>
+  <!--link rel='stylesheet' href='style1.css'-->
+  <style>
+ :root {
+  --primary-color: #2c7a4d;
+  --secondary-color: #4a5568;
+  --accent-color: #38a169;
+  --border-color: #e2e8f0;
+  --bg-color: #f7fafc;
+  --text-color: #2d3748;
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  max-width: 450px;
+  margin: 0 auto;
+  padding: 15px;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.data-time {
+  display: block;
+  text-align: center;
+  font-size: 0.85em;
+  color: var(--secondary-color);
+  margin-bottom: 10px;
+}
+
+.card {
+  background: white;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 15px;
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--border-color);
+}
+
+.card-title {
+  color: var(--primary-color);
+  margin-top: 0;
+  margin-bottom: 15px;
+  text-align: center;  
+  font-size: 1.1em;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+}
+
+.large {
+  width: 100%;
+}
+
+/* ТАБЛИЦА С ИНФОРМАЦИЕЙ */
+
+.info-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.info-table td {
+  padding: 8px 5px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.info-table td:first-child {
+  font-weight: 500;
+  color: var(--secondary-color);
+  width: 60%;
+}
+
+.error {
+  color: red; 
+  margin-top: 10px;
+}
+
+.form-group {
+  margin-bottom: 15px;
+  position: relative;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+  font-size: 0.9em;
+  color: var(--secondary-color);
+}
+
+input, select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  text-align: center;
+  font-size: 0.95em;
+  transition: border-color 0.2s;
+  max-width: 100%;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+/* КНОПКИ, ГРУППЫ КНОПОК */
+
+.buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+}
+
+.button {
+  padding: 10px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin: 8px 0;
+  text-align: center;
+  font-size: 0.95em;
+  min-width: 20%;
+}
+
+.button.primary {
+  background: #006778;
+  color: white;
+}
+
+.button.secondary {
+  background: #666;
+  color: white;
+}
+
+.button.success {
+  background: #4CAF50;
+  color: white;
+}
+
+.button-group {
+  display: flex;
+  width: 100%;
+  gap: 10px;
+  margin: 15px 0;
+}
+
+.button-group .button {
+  flex: 1;
+  margin: 0;
+}
+
+/* ЗНАЧЕНИЯ */
+
+.sensor-value {
+  text-align: center;
+  color: var(--secondary-color);
+}
+
+/* ВЕРСИЯ ПО */
+
+.version-info {
+  text-align: center;
+/*  font-size: 0.85em; */
+  font-weight: 650;
+  color: var(--secondary-color);
+  margin: 15px 0;
+}
+
+hr {
+  border: 0;
+  height: 1px;
+  background-color: var(--border-color);
+  margin: 15px 0;
+}
+
+/* WIFI SETUP */
+
+.network-list {
+  position:absolute; 
+  width:100%; 
+  max-height:200px; 
+  overflow-y:auto; 
+  background:white; 
+  z-index:1000; 
+  display:none; 
+  border:1px solid #ddd; 
+  border-top:none;
+}
+
+.network-item {
+  padding:8px; 
+  cursor:pointer;
+}
+
+.network-item:hover {
+  background:#f0f0f0;
+}
+
+.scan-status {
+  color: #666;
+  font-style: italic;
+  font-size: 13px;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 10%;
+  opacity: 0.9;
+  padding: 5px 0;
+  display: none;
+  text-align: right;
+  z-index: 1001;
+  pointer-events: none;
+}
+
+/* СТИЛИ ДЛЯ ФОРМЫ ОБНОВЛЕНИЯ ПО */
+.file-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.file-input-display {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.95em;
+  background-color: white;
+  cursor: pointer;
+  color: var(--secondary-color);
+}
+
+.file-input-hidden {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.file-input-display:focus {
+  outline: none;
+  border-color: var(--accent-color);
+} 
+</style> 
+</head>
+<body>
+  <div class='card'>
+ 	<span class='data-time' id='date_time'>%DATE_TIME%</span> 
+    <h3 class='card-title'>ОБЩАЯ ИНФОРМАЦИЯ</h3>
+    <table class='info-table'>
+      <tr>
+        <td>Атмосферное давление:</td>
+        <td><span id='bme_p'>%BME_P%</span>&emsp; мм.рт.ст </td>
+      </tr>
+      <tr>
+        <td>Отн.влажность воздуха:</td>
+        <td><span id='bme_h'>%BME_H%</span>&emsp; &#37; </td>
+      </tr>
+      <tr>
+        <td>Температура воздуха:</td>
+        <td><span id='bme_t'>%BME_T%</span>&emsp; &deg;C </td>
+      </tr>
+	</table>   
+	<span id='a_in_sns'>%A_IN_SNS%</span>
+	<span id='one_wire_sns'>%ONE_WIRE_SNS%</span>
+  </div>
+  
+  <div class='card'>
+    <h3 class='card-title'>УПРАВЛЕНИЕ</h3>	
+      <div class='form-group'>
+        <label>Вентиляция в теплице (режим %VENT_MODE%):</label>
+		<form action='/ventilation'><button id='vent_state' class='button primary large'>%VENT_STATE%</button></form>
+      </div> 	
+     <div class='form-group'>
+        <label>Насос гидропоники (режим %PUMP_MODE%):</label>
+		<td><form action='/hydroponics'><button id='pump_state' class='button primary large'>%PUMP_STATE%</button></form>
+      </div> 	
+     <div class='form-group'>
+        <label>Клапан полива (режим %WATERING_MODE%):</label>
+		<form action='/watering'><button id='watering_state' class='button primary large'>%WATERING_STATE%</button></form>
+      </div> 	
+     <div class='form-group'>
+        <label>Клапан наполнения бочек (режим %WATER_SUPPLY_MODE%):</label>
+		<form action='/water_supply'><button id='water_supply_state' class='button primary large'>%WATER_SUPPLY_STATE%</button></form>
+      </div> 	
+  </div>
+
+  <div class='card'>
+    <h3 class='card-title'>СЕТЕВЫЕ ПОДКЛЮЧЕНИЯ</h3>
+	
+      <div class='form-group'>
+        <label>Подключение к сети WiFi:</label>
+		<div class='value' id='wifi_state'>%WIFI_STATE%</div>			
+      </div> 
+	  
+      <div class='form-group'>
+        <label> ... получен IP адрес:</label>
+		<div class='value' id='get_ip'>%GET_IP%</div>		
+      </div> 
+	  
+      <div class='form-group'>
+        <label>Точка доступа:</label>
+		<div class='value' id='ap_state'>%AP_STATE%</div>
+      </div> 
+	  
+      <div class='form-group'>
+        <label>Подключение к серверу времени NTP:</label>
+		<div class='value' id='ntp_state'>%NTP_STATE%</div>
+      </div> 
+	  
+     <div class='form-group'>
+        <label>Подключение к MQTT серверу:</label>
+		<div class='value' id='mqtt_state'>%MQTT_STATE%</div>
+      </div> 
+	  
+     <!--div class='form-group'>
+        <label>Контроллер полива Aquarius:</label>
+		<div class='value' id='aquarius_state'-->%AQUARIUS_STATE%<!--/div>
+      </div--> 	
+	</div>	
+
+	<form action='/settings'>
+	  <button class='button primary large' style='font-size:0.9rem'>%VERSION_FW%</button>
+	</form>
+
+	<!--form action='/login'>
+	  <button class='button primary large'>Login</button>
+	</form-->
+	<span id='logout_btn'>%LOGOUT_BTN%</span>
+
+
+
+<script>
+  /* --- Обновление значений каждую 1 секунду --- */
+  setInterval(function ( ) {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        document.getElementById('date_time').innerHTML = this.responseText;
+      }
+    };
+    xhttp.open('GET', '/date_time', true);
+    xhttp.send();
+  }, 1000 ) ;
+
+  setInterval(function ( ) {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        document.getElementById('vent_state').innerHTML = this.responseText;
+      }
+    };
+    xhttp.open('GET', '/vent_state', true);
+    xhttp.send();
+  }, 1000 ) ;   
+
+  setInterval(function ( ) {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        document.getElementById('pump_state').innerHTML = this.responseText;
+      }
+    };
+    xhttp.open('GET', '/pump_state', true);
+    xhttp.send();
+  }, 1000 ) ;   
+
+  setInterval(function ( ) {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        document.getElementById('watering_state').innerHTML = this.responseText;
+      }
+    };
+    xhttp.open('GET', '/watering_state', true);
+    xhttp.send();
+  }, 1000 ) ;   
+
+  setInterval(function ( ) {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        document.getElementById('water_supply_state').innerHTML = this.responseText;
+      }
+    };
+    xhttp.open('GET', '/water_supply_state', true);
+    xhttp.send();
+  }, 1000 ) ;   
+  
+  setInterval(function ( ) {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        document.getElementById('logout_btn').innerHTML = this.responseText;
+      }
+    };
+    xhttp.open('GET', '/logout_btn', true);
+    xhttp.send();
+  }, 1000 ) ;     
+
+  /* --- Обновление значений каждые 10 секунд --- */
+  setInterval(function ( ) {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        document.getElementById('bme_p').innerHTML = this.responseText;
+      }
+    };
+    xhttp.open('GET', '/bme_p', true);
+    xhttp.send();
+  }, 10000 ) ;
+  
+  setInterval(function ( ) {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        document.getElementById('bme_h').innerHTML = this.responseText;
+      }
+    };
+    xhttp.open('GET', '/bme_h', true);
+    xhttp.send();
+  }, 10000 ) ;
+
+  setInterval(function ( ) {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        document.getElementById('bme_t').innerHTML = this.responseText;
+      }
+    };
+    xhttp.open('GET', '/bme_t', true);
+    xhttp.send();
+  }, 10000 ) ;
+  
+  setInterval(function ( ) {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        document.getElementById('a_in_sns').innerHTML = this.responseText;
+      }
+    };
+    xhttp.open('GET', '/a_in_sns', true);
+    xhttp.send();
+  }, 10000 ) ; 
+  
+  setInterval(function ( ) {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        document.getElementById('one_wire_sns').innerHTML = this.responseText;
+      }
+    };
+    xhttp.open('GET', '/one_wire_sns', true);
+    xhttp.send();
+  }, 10000 ) ;   
+
+  setInterval(function() {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        document.getElementById('get_ip').innerHTML = this.responseText;
+      }
+    };
+    xhttp.open("GET", "/get_ip", true);
+    xhttp.send();
+  }, 10000);
+  
+  setInterval(function() {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        document.getElementById('ap_state').innerHTML = this.responseText;
+      }
+    };
+    xhttp.open("GET", "/ap_state", true);
+    xhttp.send();
+  }, 10000);  
+
+  /* --- Обновление значений каждые 30 секунд --- */
+  setInterval(function ( ) {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        document.getElementById('wifi_state').innerHTML = this.responseText;
+      }
+    };
+    xhttp.open('GET', '/wifi_state', true);
+    xhttp.send();
+  }, 30000 ) ;   
+
+  setInterval(function ( ) {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        document.getElementById('mqtt_state').innerHTML = this.responseText;
+      }
+    };
+    xhttp.open('GET', '/mqtt_state', true);
+    xhttp.send();
+  }, 30000 ) ; 
+
+  setInterval(function ( ) {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        document.getElementById('aquarius_state').innerHTML = this.responseText;
+      }
+    };
+    xhttp.open('GET', '/aquarius_state', true);
+    xhttp.send();
+  }, 30000 ) ;
+  
+   setInterval(function ( ) {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        document.getElementById('ntp_state').innerHTML = this.responseText;
+      }
+    };
+    xhttp.open('GET', '/ntp_state', true);
+    xhttp.send();
+  }, 30000 ) ; 
+   
+</script>
+</body>
+</html>  
